@@ -33,7 +33,7 @@ export default async function FinancePage() {
         <p className="text-sm text-gray-500 mt-1">Revenue tracking across all work orders</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-lg border border-gray-200 p-5 border-l-4 border-l-green-500">
           <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Paid</div>
           <div className="text-2xl font-bold mt-1 font-mono text-green-600">${paid.toLocaleString()}</div>
