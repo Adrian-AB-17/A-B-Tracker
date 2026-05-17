@@ -1,38 +1,23 @@
 import { createClient } from '@/lib/supabase/server'
-import BoardClient from '@/components/work-orders/BoardClient'
 
 export default async function DashboardPage() {
   const supabase = createClient()
 
-  const { data: workOrders, error: woError } = await supabase
+  // Test 1: Most basic query
+  const start = Date.now()
+  const { data: workOrders, error } = await supabase
     .from('work_orders')
-    .select(`
-      *,
-      clients!work_orders_client_id_fkey(name),
-      services!work_orders_service_id_fkey(name, category),
-      team_members!work_orders_owner_id_fkey(name)
-    `)
-    .not('stage', 'eq', 'archived')
-    .order('created_at', { ascending: false })
-    .limit(500)
-
-  if (woError) console.error('Work orders query error:', woError)
-
-  const { data: clients } = await supabase
-    .from('clients').select('id, name').order('name')
-
-  const { data: services } = await supabase
-    .from('services').select('id, name, category, base_price, occurrence').order('name')
-
-  const { data: team } = await supabase
-    .from('team_members').select('id, name, role').order('name')
+    .select('id, title, stage')
+    .limit(10)
+  const elapsed = Date.now() - start
 
   return (
-    <BoardClient
-      initialWorkOrders={workOrders || []}
-      clients={clients || []}
-      services={services || []}
-      team={team || []}
-    />
+    <div style={{ padding: 40, fontFamily: 'monospace' }}>
+      <h1>Dashboard Diagnostic</h1>
+      <p>Query took: {elapsed}ms</p>
+      <p>Error: {error ? JSON.stringify(error) : 'none'}</p>
+      <p>Rows returned: {workOrders?.length || 0}</p>
+      <pre>{JSON.stringify(workOrders, null, 2)}</pre>
+    </div>
   )
 }
