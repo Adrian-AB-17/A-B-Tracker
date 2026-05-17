@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { STAGES } from '@/lib/types'
 
 export default async function MyTasksPage() {
-  const supabase = await createClient()
+  const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   const { data: member } = await supabase.from('team_members').select('id').eq('auth_user_id', user!.id).single()
 

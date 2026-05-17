@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 
 export default async function FinancePage() {
-  const supabase = await createClient()
+  const supabase = createClient()
   const { data: wos } = await supabase
     .from('work_orders')
     .select(`stage, est_cost, add_cost, clients(name)`)

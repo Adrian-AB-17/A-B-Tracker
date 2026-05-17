@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { STAGES } from '@/lib/types'
 
 export default async function PipelinePage() {
-  const supabase = await createClient()
+  const supabase = createClient()
   const { data: wos } = await supabase.from('work_orders').select('stage, est_cost, add_cost')
 
   const byStage: Record<string, { count: number; value: number }> = {}
