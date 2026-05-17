@@ -33,12 +33,10 @@ export async function POST(request: NextRequest) {
     status: 303,
   })
 
-  // Extract project ref from Supabase URL for cookie naming
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const projectRef = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/)?.[1] || 'default'
   const cookieName = `sb-${projectRef}-auth-token`
 
-  // Manually serialize the session as Supabase expects
   const sessionPayload = JSON.stringify({
     access_token: data.session.access_token,
     refresh_token: data.session.refresh_token,
@@ -48,13 +46,12 @@ export async function POST(request: NextRequest) {
     user: data.session.user,
   })
 
-  // Set the auth cookie manually
   response.cookies.set(cookieName, sessionPayload, {
     path: '/',
     httpOnly: false,
     secure: true,
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24 * 7, // 7 days
+    maxAge: 60 * 60 * 24 * 7,
   })
 
   console.log('COOKIE SET:', { cookieName, size: sessionPayload.length })
