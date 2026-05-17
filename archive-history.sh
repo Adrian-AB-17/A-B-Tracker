@@ -1,3 +1,11 @@
+#!/bin/bash
+# ab-tracker — archive/delete + stage history
+set -e
+cd ~/ab-tracker
+
+echo "→ Updating BoardClient with archive/delete + stage history..."
+
+cat > components/work-orders/BoardClient.tsx << 'EOF'
 'use client'
 import { useState, useMemo, useEffect } from 'react'
 import { STAGES, type WorkOrder, type WoStage } from '@/lib/types'
@@ -628,3 +636,11 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     </div>
   )
 }
+EOF
+
+echo ""
+echo "✅ Archive + Delete + Stage History added!"
+echo ""
+echo "Next: build + push"
+echo "  cd ~/ab-tracker && npm run build && git add -A && git commit -m 'Features: archive/delete + stage history' && git push"
+echo ""
