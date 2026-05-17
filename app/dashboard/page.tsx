@@ -4,20 +4,28 @@ import BoardClient from '@/components/work-orders/BoardClient'
 export default async function DashboardPage() {
   const supabase = createClient()
 
-  const { data: workOrders } = await supabase
+  const { data: workOrders, error: woError } = await supabase
     .from('work_orders')
-    .select(`*, clients(name), services(name, category), team_members(name)`)
+    .select(`
+      *,
+      clients!work_orders_client_id_fkey(name),
+      services!work_orders_service_id_fkey(name, category),
+      team_members!work_orders_owner_id_fkey(name)
+    `)
     .not('stage', 'eq', 'archived')
     .order('created_at', { ascending: false })
+    .limit(500)
+
+  if (woError) console.error('Work orders query error:', woError)
 
   const { data: clients } = await supabase
-    .from('clients').select('id, name').eq('status', 'active').order('name')
+    .from('clients').select('id, name').order('name')
 
   const { data: services } = await supabase
-    .from('services').select('id, name, category, base_price, occurrence').eq('active', true).order('sort_order')
+    .from('services').select('id, name, category, base_price, occurrence').order('name')
 
   const { data: team } = await supabase
-    .from('team_members').select('id, name, role').eq('active', true).order('name')
+    .from('team_members').select('id, name, role').order('name')
 
   return (
     <BoardClient
