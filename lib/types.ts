@@ -24,7 +24,7 @@ export interface WorkOrder {
   description?: string
   client_id: string
   service_id: string
-  assignee_id?: string
+  owner_id?: string
   stage: WoStage
   priority: 'low' | 'medium' | 'high' | 'urgent'
   est_cost?: number
