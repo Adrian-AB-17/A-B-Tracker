@@ -454,11 +454,11 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                   <div className="relative">
                     <span className="absolute left-2 top-2 text-sm text-gray-400">$</span>
                     {isNew ? (
-                      <input type="number" value={newWo.est_cost || 0}
+                      <input type="number" value={newWo.est_cost ?? ""}
                         onChange={e => setNewWo({ ...newWo, est_cost: parseFloat(e.target.value) || 0 })}
                         className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
                     ) : (
-                      <input type="number" defaultValue={wo?.est_cost || 0}
+                      <input type="number" defaultValue={wo?.est_cost || ""}
                         onBlur={e => updateWo({ est_cost: parseFloat(e.target.value) || 0 })}
                         className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
                     )}
@@ -469,11 +469,11 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                   <div className="relative">
                     <span className="absolute left-2 top-2 text-sm text-gray-400">$</span>
                     {isNew ? (
-                      <input type="number" value={newWo.add_cost || 0}
+                      <input type="number" value={newWo.add_cost ?? ""}
                         onChange={e => setNewWo({ ...newWo, add_cost: parseFloat(e.target.value) || 0 })}
                         className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
                     ) : (
-                      <input type="number" defaultValue={wo?.add_cost || 0}
+                      <input type="number" defaultValue={wo?.add_cost || ""}
                         onBlur={e => updateWo({ add_cost: parseFloat(e.target.value) || 0 })}
                         className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
                     )}
