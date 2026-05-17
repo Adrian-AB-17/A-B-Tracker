@@ -1,27 +1,17 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 
-export default async function DashboardPage() {
-  const supabase = createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const start = Date.now()
-  const { data: workOrders, error } = await supabase
-    .from('work_orders')
-    .select('id, title, stage')
-    .limit(10)
-  const elapsed = Date.now() - start
+export default function DashboardPage() {
+  const cookieStore = cookies()
+  const allCookies = cookieStore.getAll()
 
   return (
-    <div style={{ padding: 40, fontFamily: 'monospace' }}>
-      <h1>Dashboard - Logged In ✓</h1>
-      <p>Email: {user.email}</p>
-      <p>Query took: {elapsed}ms</p>
-      <p>Error: {error ? JSON.stringify(error) : 'none'}</p>
-      <p>Rows: {workOrders?.length || 0}</p>
-      <pre>{JSON.stringify(workOrders, null, 2)}</pre>
+    <div style={{ padding: 40, fontFamily: 'monospace', fontSize: 14 }}>
+      <h1>Dashboard - Cookie Inspector</h1>
+      <p>Total cookies received: {allCookies.length}</p>
+      <h2>All cookies:</h2>
+      <pre style={{ background: '#f5f5f5', padding: 10, overflow: 'auto' }}>
+        {allCookies.map(c => c.name + ': ' + c.value.substring(0, 60) + '...').join('\n')}
+      </pre>
     </div>
   )
 }
