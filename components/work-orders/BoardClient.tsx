@@ -36,6 +36,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [filterOwner, setFilterOwner] = useState('')
   const [selectedWo, setSelectedWo] = useState<WoOrNew | null>(null)
   const [saving, setSaving] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverStage, setDragOverStage] = useState<WoStage | null>(null)
   const [mobileStage, setMobileStage] = useState<WoStage>('not-started')
@@ -80,6 +81,8 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     setWorkOrders(prev => prev.map(w => w.id === wo.id ? updated : w))
     await supabase.from('work_orders').update(patch).eq('id', wo.id)
     setSaving(false)
+    setJustSaved(true)
+    setTimeout(() => setJustSaved(false), 2000)
     // Refresh history if stage changed
     if (patch.stage) {
       const { data } = await supabase.from('wo_stage_history')
@@ -370,7 +373,8 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                       {STAGES.find(s => s.id === wo?.stage)?.label}
                     </span>
-                    {saving && <span className="text-xs text-blue-500 ml-2">Saving...</span>}
+                    {saving && <span className="text-xs text-blue-500 ml-2 font-medium">Saving...</span>}
+                    {!saving && justSaved && <span className="text-xs text-green-600 ml-2 font-medium">✓ Saved</span>}
                   </>
                 )}
               </div>
