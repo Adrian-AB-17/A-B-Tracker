@@ -157,18 +157,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     return ids
   }
 
-  function handleCommentInput(value: string, cursorPos: number) {
-    setNewComment(value)
-    const before = value.substring(0, cursorPos)
-    const m = before.match(/(?:^|\s)@(\w*)$/)
-    if (m) {
-      setMentionDropdown({ open: true, query: m[1].toLowerCase(), position: cursorPos - m[1].length - 1 })
-      setMentionIndex(0)
-    } else {
-      setMentionDropdown({ open: false, query: '', position: 0 })
-    }
-  }
-
     async function postComment() {
     if (!selectedWo || (selectedWo as any).__new) return
     const wo = selectedWo as WorkOrder
