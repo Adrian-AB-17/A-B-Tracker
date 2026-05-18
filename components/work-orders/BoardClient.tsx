@@ -33,6 +33,22 @@ type Comment = {
   created_at: string
 }
 
+type Task = {
+  id: string
+  work_order_id: string
+  description: string
+  assignee_id: string | null
+  due_date: string | null
+  assigned_at: string
+  priority: 'low' | 'medium' | 'high' | 'urgent'
+  status: 'todo' | 'in-progress' | 'done'
+  link: string | null
+  notes: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
 type WoOrNew = WorkOrder | { __new: true } & Partial<WorkOrder>
 
 function ClientDate({ children }: { children: React.ReactNode }) {
@@ -75,6 +91,9 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [mentionDropdown, setMentionDropdown] = useState<{ open: boolean; query: string; position: number }>({ open: false, query: '', position: 0 })
   const [mentionIndex, setMentionIndex] = useState(0)
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [newTaskDesc, setNewTaskDesc] = useState('')
+  const [addingTask, setAddingTask] = useState(false)
   const supabase = createClient()
 
   // Auto-open WO from ?wo=X param (when arriving from Clients or All Work Orders)
@@ -115,6 +134,17 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       .eq('work_order_id', wo.id)
       .order('created_at', { ascending: true })
       .then(({ data }) => setComments(data || []))
+  }, [selectedWo, supabase])
+
+  // Load tasks when a non-new WO is selected
+  useEffect(() => {
+    if (!selectedWo || (selectedWo as any).__new) { setTasks([]); return }
+    const wo = selectedWo as WorkOrder
+    supabase.from('wo_tasks')
+      .select('*')
+      .eq('work_order_id', wo.id)
+      .order('sort_order', { ascending: true })
+      .then(({ data }) => setTasks((data || []) as Task[]))
   }, [selectedWo, supabase])
 
   function handleCommentInput(value: string, cursorPos: number) {
@@ -210,6 +240,53 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     const { error } = await supabase.from('wo_comments').delete().eq('id', commentId)
     if (error) { alert('Failed to delete: ' + error.message); return }
     setComments(prev => prev.filter(c => c.id !== commentId))
+  }
+
+  async function addTask() {
+    if (!selectedWo || (selectedWo as any).__new) return
+    const wo = selectedWo as WorkOrder
+    const desc = newTaskDesc.trim()
+    if (!desc) return
+    setAddingTask(true)
+    const nextSort = tasks.length > 0 ? Math.max(...tasks.map(t => t.sort_order)) + 1 : 0
+    const today = new Date().toISOString().substring(0, 10)
+    const { data, error } = await supabase.from('wo_tasks')
+      .insert({
+        work_order_id: wo.id,
+        description: desc,
+        assignee_id: wo.owner_id || null,
+        priority: 'medium',
+        status: 'todo',
+        assigned_at: today,
+        sort_order: nextSort,
+      })
+      .select()
+      .single()
+    setAddingTask(false)
+    if (error) { alert('Failed to add task: ' + error.message); return }
+    setTasks(prev => [...prev, data as Task])
+    setNewTaskDesc('')
+  }
+
+  async function patchTask(taskId: string, patch: Partial<Task>) {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...patch } as Task : t))
+    const { error } = await supabase.from('wo_tasks').update(patch).eq('id', taskId)
+    if (error) {
+      alert('Failed to update task: ' + error.message)
+      // Reload to recover from optimistic update mismatch
+      if (selectedWo && !(selectedWo as any).__new) {
+        const wo = selectedWo as WorkOrder
+        const { data } = await supabase.from('wo_tasks').select('*').eq('work_order_id', wo.id).order('sort_order', { ascending: true })
+        setTasks((data || []) as Task[])
+      }
+    }
+  }
+
+  async function deleteTask(taskId: string) {
+    if (!confirm('Delete this task?')) return
+    setTasks(prev => prev.filter(t => t.id !== taskId))
+    const { error } = await supabase.from('wo_tasks').delete().eq('id', taskId)
+    if (error) alert('Failed to delete task: ' + error.message)
   }
 
   const filtered = useMemo(() => {
@@ -1048,6 +1125,160 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                   )}
                 </div>
               </div>
+
+              {/* ─── Tasks (existing WO only) ─── */}
+              {!isNew && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-gray-100 pb-1">
+                    <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                      Tasks {tasks.length > 0 && (
+                        <span className="ml-1 text-gray-500 font-mono normal-case">
+                          {tasks.filter(t => t.status === 'done').length}/{tasks.length} done
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {tasks.length === 0 && (
+                    <div className="text-xs text-gray-400 italic px-1">
+                      No tasks yet. Break this work order into smaller actionable steps.
+                    </div>
+                  )}
+
+                  {tasks.map(task => {
+                    const isDone = task.status === 'done'
+                    const today = new Date().toISOString().substring(0, 10)
+                    const isOverdue = !isDone && task.due_date && task.due_date < today
+                    const isDueToday = !isDone && task.due_date && task.due_date === today
+                    return (
+                      <div key={task.id} className={`rounded-lg border p-3 space-y-2 ${
+                        isDone ? 'border-gray-100 bg-gray-50 opacity-70' :
+                        isOverdue ? 'border-red-200 bg-red-50/40' :
+                        isDueToday ? 'border-amber-200 bg-amber-50/40' :
+                        'border-gray-200 bg-white'
+                      }`}>
+                        {/* Row 1: checkbox + description */}
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isDone}
+                            onChange={e => patchTask(task.id, { status: e.target.checked ? 'done' : 'todo' })}
+                            className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                          />
+                          <input
+                            type="text"
+                            defaultValue={task.description}
+                            onBlur={e => {
+                              const v = e.target.value.trim()
+                              if (v && v !== task.description) patchTask(task.id, { description: v })
+                              else if (!v) e.target.value = task.description
+                            }}
+                            className={`flex-1 text-sm bg-transparent border-0 px-1 py-0.5 focus:outline-none focus:bg-white focus:border focus:border-blue-500 focus:rounded ${
+                              isDone ? 'line-through text-gray-500' : 'text-gray-900'
+                            }`}
+                          />
+                          <button onClick={() => deleteTask(task.id)}
+                            className="text-gray-300 hover:text-red-500 text-sm leading-none px-1"
+                            title="Delete task">×</button>
+                        </div>
+
+                        {/* Row 2: meta grid */}
+                        <div className="grid grid-cols-3 gap-2 pl-6">
+                          <div>
+                            <label className="block text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Assignee</label>
+                            <select value={task.assignee_id || ''}
+                              onChange={e => patchTask(task.id, { assignee_id: e.target.value || null })}
+                              className="w-full text-xs px-1.5 py-1 border border-gray-200 rounded focus:border-blue-500 focus:outline-none bg-white">
+                              <option value="">Unassigned</option>
+                              {team.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Due</label>
+                            <input type="date"
+                              defaultValue={task.due_date || ''}
+                              onBlur={e => patchTask(task.id, { due_date: e.target.value || null })}
+                              className={`w-full text-xs px-1.5 py-1 border rounded focus:border-blue-500 focus:outline-none bg-white ${
+                                isOverdue ? 'border-red-300 text-red-700' :
+                                isDueToday ? 'border-amber-300 text-amber-700' :
+                                'border-gray-200'
+                              }`} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Priority</label>
+                            <select value={task.priority}
+                              onChange={e => patchTask(task.id, { priority: e.target.value as Task['priority'] })}
+                              className="w-full text-xs px-1.5 py-1 border border-gray-200 rounded focus:border-blue-500 focus:outline-none bg-white">
+                              <option value="low">Low</option>
+                              <option value="medium">Medium</option>
+                              <option value="high">High</option>
+                              <option value="urgent">Urgent</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Row 3: status + link + notes inputs */}
+                        <div className="grid grid-cols-2 gap-2 pl-6">
+                          <div>
+                            <label className="block text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Status</label>
+                            <select value={task.status}
+                              onChange={e => patchTask(task.id, { status: e.target.value as Task['status'] })}
+                              className="w-full text-xs px-1.5 py-1 border border-gray-200 rounded focus:border-blue-500 focus:outline-none bg-white">
+                              <option value="todo">To Do</option>
+                              <option value="in-progress">In Progress</option>
+                              <option value="done">✓ Done</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Link</label>
+                            <input type="url"
+                              defaultValue={task.link || ''}
+                              onBlur={e => {
+                                const v = e.target.value.trim()
+                                if (v !== (task.link || '')) patchTask(task.id, { link: v || null })
+                              }}
+                              placeholder="https://..."
+                              className="w-full text-xs px-1.5 py-1 border border-gray-200 rounded focus:border-blue-500 focus:outline-none bg-white" />
+                          </div>
+                        </div>
+
+                        {/* Row 4: notes */}
+                        <div className="pl-6">
+                          <label className="block text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Notes</label>
+                          <textarea
+                            defaultValue={task.notes || ''}
+                            onBlur={e => {
+                              const v = e.target.value
+                              if (v !== (task.notes || '')) patchTask(task.id, { notes: v || null })
+                            }}
+                            rows={1}
+                            placeholder="Optional notes..."
+                            className="w-full text-xs px-1.5 py-1 border border-gray-200 rounded resize-none focus:border-blue-500 focus:outline-none bg-white" />
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* Add task input */}
+                  <div className="flex gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={newTaskDesc}
+                      onChange={e => setNewTaskDesc(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTask() } }}
+                      placeholder="+ Add task — press Enter"
+                      className="flex-1 text-sm px-3 py-2 border border-dashed border-gray-300 rounded focus:border-blue-500 focus:border-solid focus:outline-none"
+                    />
+                    {newTaskDesc.trim() && (
+                      <button onClick={addTask} disabled={addingTask}
+                        className="px-3 py-2 rounded text-xs font-semibold text-white disabled:opacity-40"
+                        style={{ background: '#1a2b4a' }}>
+                        {addingTask ? '...' : 'Add'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Comments (existing WO only) */}
               {!isNew && (
