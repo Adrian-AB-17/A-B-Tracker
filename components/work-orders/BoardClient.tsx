@@ -587,16 +587,14 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                         return (
                           <div key={entry.id} className="flex items-start gap-2 text-xs">
                             <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: to?.color || '#94a3b8' }} />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-gray-700">
-                                <span className="text-gray-400">{from?.label || entry.from_stage || '—'}</span>
-                                <span className="mx-1.5 text-gray-300">→</span>
-                                <span className="font-medium" style={{ color: to?.color }}>{to?.label || entry.to_stage}</span>
-                              </div>
-                              <div className="text-gray-400 text-[11px] mt-0.5">
-                                {new Date(entry.changed_at).toLocaleString()}
-                                {byName && <span> · by {byName}</span>}
-                              </div>
+                            <div className="flex-1 min-w-0 text-gray-700 leading-relaxed">
+                              <span className="text-gray-500">Moved to </span>
+                              <span className="font-semibold" style={{ color: to?.color }}>{to?.label || entry.to_stage}</span>
+                              <span className="text-gray-500"> on </span>
+                              <span className="text-gray-700">{new Date(entry.changed_at).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: '2-digit' })}</span>
+                              <span className="text-gray-500"> at </span>
+                              <span className="text-gray-700">{new Date(entry.changed_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>
+                              {byName && <><span className="text-gray-500"> by </span><span className="font-medium text-gray-800">{byName}</span></>}
                             </div>
                           </div>
                         )
