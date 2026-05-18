@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo, useEffect } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+// removed unused next/navigation imports
 import { STAGES, type WorkOrder, type WoStage } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 
@@ -46,6 +46,14 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [filterService, setFilterService] = useState('')
   const [filterOwner, setFilterOwner] = useState('')
   const [selectedWo, setSelectedWo] = useState<WoOrNew | null>(null)
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { setSelectedWo(null); setNewWo({}) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
   const [saving, setSaving] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
@@ -61,8 +69,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [mentionDropdown, setMentionDropdown] = useState<{ open: boolean; query: string; position: number }>({ open: false, query: '', position: 0 })
   const [mentionIndex, setMentionIndex] = useState(0)
   const supabase = createClient()
-  const searchParams = useSearchParams()
-  const router = useRouter()
 
   // Auto-open WO from ?wo=X param (when arriving from Clients or All Work Orders)
   useEffect(() => {
