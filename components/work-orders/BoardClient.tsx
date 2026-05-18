@@ -276,6 +276,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [newWo, setNewWo] = useState<Partial<WorkOrder>>({})
   function openNewWo() {
     setNewWo({ title: '', stage: 'not-started', priority: 'medium',
+      occurrence: 'One-time',
       client_id: clients[0]?.id || '', service_id: services[0]?.id || '',
       owner_id: '', est_cost: 0, add_cost: 0 })
     setSelectedWo({ __new: true } as any)
@@ -289,8 +290,13 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       title: newWo.title, description: newWo.description || null,
       client_id: newWo.client_id, service_id: newWo.service_id,
       owner_id: newWo.owner_id || null, stage: newWo.stage || 'not-started',
-      priority: newWo.priority || 'medium', est_cost: newWo.est_cost || 0,
+      priority: newWo.priority || 'medium', occurrence: newWo.occurrence || 'One-time',
+      est_cost: newWo.est_cost || 0,
       add_cost: newWo.add_cost || 0, due_date: newWo.due_date || null,
+      branch: newWo.branch || null, vendor: newWo.vendor || null,
+      deliverables_link: newWo.deliverables_link || null,
+      notes_link: newWo.notes_link || null, notes: newWo.notes || null,
+      submitted_at: new Date().toISOString(),
     }
     const { data, error } = await supabase.from('work_orders').insert(payload)
       .select(`*, clients!work_orders_client_id_fkey(name), services!work_orders_service_id_fkey(name, category), team_members!work_orders_owner_id_fkey(name)`)
@@ -663,172 +669,306 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                 className="text-gray-400 hover:text-gray-700 text-2xl leading-none w-10 h-10 flex items-center justify-center rounded hover:bg-gray-100">×</button>
             </div>
 
-            <div className="px-4 md:px-6 py-5 space-y-5">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Title {isNew && '*'}</label>
-                {isNew ? (
-                  <input type="text" autoFocus value={newWo.title || ''}
-                    onChange={e => setNewWo({ ...newWo, title: e.target.value })}
-                    placeholder="What needs to be done?"
-                    className="w-full text-lg font-semibold text-gray-900 px-3 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
-                ) : (
-                  <input type="text" defaultValue={wo?.title || ''}
-                    onBlur={e => e.target.value !== wo?.title && updateWo({ title: e.target.value })}
-                    className="w-full text-lg font-semibold text-gray-900 px-3 py-2 border border-transparent rounded hover:border-gray-200 focus:border-blue-500 focus:outline-none" />
-                )}
-              </div>
+            <div className="px-4 md:px-6 py-5 space-y-6">
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Description</label>
-                {isNew ? (
-                  <textarea value={newWo.description || ''}
-                    onChange={e => setNewWo({ ...newWo, description: e.target.value })}
-                    rows={3} placeholder="Add a description..."
-                    className="w-full text-sm text-gray-700 px-3 py-2 border border-gray-200 rounded resize-none focus:border-blue-500 focus:outline-none" />
-                ) : (
-                  <textarea defaultValue={wo?.description || ''}
-                    onBlur={e => e.target.value !== wo?.description && updateWo({ description: e.target.value })}
-                    rows={3} placeholder="Add a description..."
-                    className="w-full text-sm text-gray-700 px-3 py-2 border border-gray-200 rounded resize-none focus:border-blue-500 focus:outline-none" />
-                )}
-              </div>
+              {/* ─── Project ─── */}
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Project</div>
 
-              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Stage</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Title {isNew && '*'}</label>
                   {isNew ? (
-                    <select value={newWo.stage || 'not-started'}
-                      onChange={e => setNewWo({ ...newWo, stage: e.target.value as WoStage })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
-                      {STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </select>
+                    <input type="text" autoFocus value={newWo.title || ''}
+                      onChange={e => setNewWo({ ...newWo, title: e.target.value })}
+                      placeholder="What needs to be done?"
+                      className="w-full text-lg font-semibold text-gray-900 px-3 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
                   ) : (
-                    <select value={wo?.stage}
-                      onChange={e => updateWo({ stage: e.target.value as WoStage })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
-                      {STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-                    </select>
+                    <input type="text" defaultValue={wo?.title || ''}
+                      onBlur={e => e.target.value !== wo?.title && updateWo({ title: e.target.value })}
+                      className="w-full text-lg font-semibold text-gray-900 px-3 py-2 border border-transparent rounded hover:border-gray-200 focus:border-blue-500 focus:outline-none" />
                   )}
                 </div>
+
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Priority</label>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Description</label>
                   {isNew ? (
-                    <select value={newWo.priority || 'medium'}
-                      onChange={e => setNewWo({ ...newWo, priority: e.target.value as any })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
-                      <option value="low">Low</option><option value="medium">Medium</option>
-                      <option value="high">High</option><option value="urgent">Urgent</option>
-                    </select>
+                    <textarea value={newWo.description || ''}
+                      onChange={e => setNewWo({ ...newWo, description: e.target.value })}
+                      rows={3} placeholder="Add a description..."
+                      className="w-full text-sm text-gray-700 px-3 py-2 border border-gray-200 rounded resize-none focus:border-blue-500 focus:outline-none" />
                   ) : (
-                    <select value={wo?.priority || 'medium'}
-                      onChange={e => updateWo({ priority: e.target.value as any })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
-                      <option value="low">Low</option><option value="medium">Medium</option>
-                      <option value="high">High</option><option value="urgent">Urgent</option>
-                    </select>
+                    <textarea defaultValue={wo?.description || ''}
+                      onBlur={e => e.target.value !== wo?.description && updateWo({ description: e.target.value })}
+                      rows={3} placeholder="Add a description..."
+                      className="w-full text-sm text-gray-700 px-3 py-2 border border-gray-200 rounded resize-none focus:border-blue-500 focus:outline-none" />
                   )}
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Client {isNew && '*'}</label>
-                  {isNew ? (
-                    <select value={newWo.client_id || ''}
-                      onChange={e => setNewWo({ ...newWo, client_id: e.target.value })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
-                      <option value="">— Select —</option>
-                      {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  ) : (
-                    <select value={wo?.client_id || ''}
-                      onChange={e => updateWo({ client_id: e.target.value })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
-                      {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Service {isNew && '*'}</label>
-                  {isNew ? (
-                    <select value={newWo.service_id || ''}
-                      onChange={e => setNewWo({ ...newWo, service_id: e.target.value })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
-                      <option value="">— Select —</option>
-                      {services.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  ) : (
-                    <select value={wo?.service_id || ''}
-                      onChange={e => updateWo({ service_id: e.target.value })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
-                      {services.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Owner</label>
-                  {isNew ? (
-                    <select value={newWo.owner_id || ''}
-                      onChange={e => setNewWo({ ...newWo, owner_id: e.target.value })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
-                      <option value="">Unassigned</option>
-                      {team.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  ) : (
-                    <select value={wo?.owner_id || ''}
-                      onChange={e => updateWo({ owner_id: e.target.value })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
-                      <option value="">Unassigned</option>
-                      {team.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Due Date</label>
-                  {isNew ? (
-                    <input type="date" value={newWo.due_date ? (newWo.due_date as string).substring(0,10) : ''}
-                      onChange={e => setNewWo({ ...newWo, due_date: e.target.value || undefined })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
-                  ) : (
-                    <input type="date" defaultValue={wo?.due_date ? wo.due_date.substring(0, 10) : ''}
-                      onBlur={e => updateWo({ due_date: e.target.value || undefined })}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Est. Cost</label>
-                  <div className="relative">
-                    <span className="absolute left-2 top-2 text-sm text-gray-400">$</span>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Client {isNew && '*'}</label>
                     {isNew ? (
-                      <input type="number" placeholder="0" value={newWo.est_cost || ''}
-                        onChange={e => setNewWo({ ...newWo, est_cost: parseFloat(e.target.value) || 0 })}
-                        className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
+                      <select value={newWo.client_id || ''}
+                        onChange={e => setNewWo({ ...newWo, client_id: e.target.value })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        <option value="">— Select —</option>
+                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
                     ) : (
-                      <input type="number" placeholder="0" defaultValue={wo?.est_cost || ''}
-                        onBlur={e => updateWo({ est_cost: parseFloat(e.target.value) || 0 })}
-                        className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
+                      <select value={wo?.client_id || ''}
+                        onChange={e => updateWo({ client_id: e.target.value })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
                     )}
                   </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Add. Cost</label>
-                  <div className="relative">
-                    <span className="absolute left-2 top-2 text-sm text-gray-400">$</span>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Service {isNew && '*'}</label>
                     {isNew ? (
-                      <input type="number" placeholder="0" value={newWo.add_cost || ''}
-                        onChange={e => setNewWo({ ...newWo, add_cost: parseFloat(e.target.value) || 0 })}
-                        className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
+                      <select value={newWo.service_id || ''}
+                        onChange={e => setNewWo({ ...newWo, service_id: e.target.value })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        <option value="">— Select —</option>
+                        {services.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
                     ) : (
-                      <input type="number" placeholder="0" defaultValue={wo?.add_cost || ''}
-                        onBlur={e => updateWo({ add_cost: parseFloat(e.target.value) || 0 })}
-                        className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
+                      <select value={wo?.service_id || ''}
+                        onChange={e => updateWo({ service_id: e.target.value })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        {services.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Branch / Location</label>
+                    {isNew ? (
+                      <input type="text" value={(newWo as any).branch || ''}
+                        onChange={e => setNewWo({ ...newWo, branch: e.target.value } as any)}
+                        placeholder="e.g. Lombard IL · HQ"
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+                    ) : (
+                      <input type="text" defaultValue={(wo as any)?.branch || ''}
+                        onBlur={e => e.target.value !== ((wo as any)?.branch || '') && updateWo({ branch: e.target.value || null } as any)}
+                        placeholder="e.g. Lombard IL · HQ"
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Occurrence</label>
+                    {isNew ? (
+                      <select value={(newWo as any).occurrence || 'One-time'}
+                        onChange={e => setNewWo({ ...newWo, occurrence: e.target.value } as any)}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        <option value="One-time">One-time</option>
+                        <option value="Recurring">Recurring</option>
+                        <option value="Quarterly">Quarterly</option>
+                        <option value="Weekly">Weekly</option>
+                      </select>
+                    ) : (
+                      <select value={(wo as any)?.occurrence || 'One-time'}
+                        onChange={e => updateWo({ occurrence: e.target.value } as any)}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        <option value="One-time">One-time</option>
+                        <option value="Recurring">Recurring</option>
+                        <option value="Quarterly">Quarterly</option>
+                        <option value="Weekly">Weekly</option>
+                      </select>
                     )}
                   </div>
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
-                <span className="text-xs font-semibold text-gray-500 uppercase">Total</span>
-                <span className="text-xl font-bold font-mono text-gray-900">
-                  ${(((isNew ? newWo.est_cost : wo?.est_cost) || 0) + ((isNew ? newWo.add_cost : wo?.add_cost) || 0)).toLocaleString()}
-                </span>
+              {/* ─── Ownership & Priority ─── */}
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Ownership &amp; Priority</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Owner</label>
+                    {isNew ? (
+                      <select value={newWo.owner_id || ''}
+                        onChange={e => setNewWo({ ...newWo, owner_id: e.target.value })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        <option value="">Unassigned</option>
+                        {team.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    ) : (
+                      <select value={wo?.owner_id || ''}
+                        onChange={e => updateWo({ owner_id: e.target.value })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        <option value="">Unassigned</option>
+                        {team.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Priority</label>
+                    {isNew ? (
+                      <select value={newWo.priority || 'medium'}
+                        onChange={e => setNewWo({ ...newWo, priority: e.target.value as any })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        <option value="low">Low</option><option value="medium">Medium</option>
+                        <option value="high">High</option><option value="urgent">Urgent</option>
+                      </select>
+                    ) : (
+                      <select value={wo?.priority || 'medium'}
+                        onChange={e => updateWo({ priority: e.target.value as any })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        <option value="low">Low</option><option value="medium">Medium</option>
+                        <option value="high">High</option><option value="urgent">Urgent</option>
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Vendor</label>
+                    {isNew ? (
+                      <input type="text" value={(newWo as any).vendor || ''}
+                        onChange={e => setNewWo({ ...newWo, vendor: e.target.value } as any)}
+                        placeholder="e.g. Mod-Pac"
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+                    ) : (
+                      <input type="text" defaultValue={(wo as any)?.vendor || ''}
+                        onBlur={e => e.target.value !== ((wo as any)?.vendor || '') && updateWo({ vendor: e.target.value || null } as any)}
+                        placeholder="e.g. Mod-Pac"
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Stage</label>
+                    {isNew ? (
+                      <select value={newWo.stage || 'not-started'}
+                        onChange={e => setNewWo({ ...newWo, stage: e.target.value as WoStage })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        {STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                      </select>
+                    ) : (
+                      <select value={wo?.stage}
+                        onChange={e => updateWo({ stage: e.target.value as WoStage })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none">
+                        {STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ─── Timeline ─── */}
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Timeline</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Submission Date</label>
+                    <div className="w-full text-sm px-2 py-2 border border-gray-100 rounded bg-gray-50 text-gray-600 font-mono">
+                      {isNew
+                        ? <span className="text-gray-400">— set on save —</span>
+                        : ((wo as any)?.submitted_at
+                            ? <ClientDate>{new Date((wo as any).submitted_at).toISOString().substring(0, 10)}</ClientDate>
+                            : <span className="text-gray-400">—</span>)
+                      }
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Due Date</label>
+                    {isNew ? (
+                      <input type="date" value={newWo.due_date ? (newWo.due_date as string).substring(0,10) : ''}
+                        onChange={e => setNewWo({ ...newWo, due_date: e.target.value || undefined })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+                    ) : (
+                      <input type="date" defaultValue={wo?.due_date ? wo.due_date.substring(0, 10) : ''}
+                        onBlur={e => updateWo({ due_date: e.target.value || undefined })}
+                        className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ─── Costs ─── */}
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Costs</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Est. Cost</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-2 text-sm text-gray-400">$</span>
+                      {isNew ? (
+                        <input type="number" placeholder="0" value={newWo.est_cost || ''}
+                          onChange={e => setNewWo({ ...newWo, est_cost: parseFloat(e.target.value) || 0 })}
+                          className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
+                      ) : (
+                        <input type="number" placeholder="0" defaultValue={wo?.est_cost || ''}
+                          onBlur={e => updateWo({ est_cost: parseFloat(e.target.value) || 0 })}
+                          className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Add. Cost</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-2 text-sm text-gray-400">$</span>
+                      {isNew ? (
+                        <input type="number" placeholder="0" value={newWo.add_cost || ''}
+                          onChange={e => setNewWo({ ...newWo, add_cost: parseFloat(e.target.value) || 0 })}
+                          className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
+                      ) : (
+                        <input type="number" placeholder="0" defaultValue={wo?.add_cost || ''}
+                          onBlur={e => updateWo({ add_cost: parseFloat(e.target.value) || 0 })}
+                          className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-gray-500 uppercase">Total</span>
+                  <span className="text-xl font-bold font-mono text-gray-900">
+                    ${(((isNew ? newWo.est_cost : wo?.est_cost) || 0) + ((isNew ? newWo.add_cost : wo?.add_cost) || 0)).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* ─── Details ─── */}
+              <div className="space-y-3">
+                <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Details</div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Deliverables Link</label>
+                  {isNew ? (
+                    <input type="url" value={(newWo as any).deliverables_link || ''}
+                      onChange={e => setNewWo({ ...newWo, deliverables_link: e.target.value } as any)}
+                      placeholder="https://drive.google.com/..."
+                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+                  ) : (
+                    <input type="url" defaultValue={(wo as any)?.deliverables_link || ''}
+                      onBlur={e => e.target.value !== ((wo as any)?.deliverables_link || '') && updateWo({ deliverables_link: e.target.value || null } as any)}
+                      placeholder="https://drive.google.com/..."
+                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Notes Link</label>
+                  {isNew ? (
+                    <input type="url" value={(newWo as any).notes_link || ''}
+                      onChange={e => setNewWo({ ...newWo, notes_link: e.target.value } as any)}
+                      placeholder="https://docs.google.com/..."
+                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+                  ) : (
+                    <input type="url" defaultValue={(wo as any)?.notes_link || ''}
+                      onBlur={e => e.target.value !== ((wo as any)?.notes_link || '') && updateWo({ notes_link: e.target.value || null } as any)}
+                      placeholder="https://docs.google.com/..."
+                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Notes</label>
+                  {isNew ? (
+                    <textarea value={(newWo as any).notes || ''}
+                      onChange={e => setNewWo({ ...newWo, notes: e.target.value } as any)}
+                      rows={4} placeholder="Internal notes about this work order..."
+                      className="w-full text-sm text-gray-700 px-3 py-2 border border-gray-200 rounded resize-none focus:border-blue-500 focus:outline-none" />
+                  ) : (
+                    <textarea defaultValue={(wo as any)?.notes || ''}
+                      onBlur={e => e.target.value !== ((wo as any)?.notes || '') && updateWo({ notes: e.target.value || null } as any)}
+                      rows={4} placeholder="Internal notes about this work order..."
+                      className="w-full text-sm text-gray-700 px-3 py-2 border border-gray-200 rounded resize-none focus:border-blue-500 focus:outline-none" />
+                  )}
+                </div>
               </div>
 
               {/* Comments (existing WO only) */}
