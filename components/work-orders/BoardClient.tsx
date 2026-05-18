@@ -35,6 +35,13 @@ type Comment = {
 
 type WoOrNew = WorkOrder | { __new: true } & Partial<WorkOrder>
 
+function ClientDate({ children }: { children: React.ReactNode }) {
+  const [m, setM] = useState(false)
+  useEffect(() => { setM(true) }, [])
+  if (!m) return null
+  return <>{children}</>
+}
+
 export default function BoardClient({ initialWorkOrders, clients, services, team }: {
   initialWorkOrders: WorkOrder[]; clients: any[]; services: any[]; team: any[]
 }) {
@@ -395,7 +402,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
           {card.clients?.name && <div className="truncate">🏢 {card.clients.name}</div>}
           {card.services?.name && <div className="truncate">⚙️ {card.services.name}</div>}
           {card.team_members?.name && <div className="truncate">👤 {card.team_members.name}</div>}
-          {card.due_date && <div>📅 {new Date(card.due_date).toLocaleDateString()}</div>}
+          {card.due_date && <div>📅 <ClientDate>{new Date(card.due_date).toLocaleDateString()}</ClientDate></div>}
         </div>
         {((card.est_cost || 0) + (card.add_cost || 0) > 0) && (
           <div className="text-xs font-mono text-gray-700 mt-2 font-semibold">
@@ -516,7 +523,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                     <div className="font-medium text-gray-900 truncate">{wo.title}</div>
                     <div className="text-red-600 text-[10px] mt-0.5">
                       {wo.clients?.name && <span>{wo.clients.name} · </span>}
-                      Due {new Date(wo.due_date!).toLocaleDateString()}
+                      Due <ClientDate>{new Date(wo.due_date!).toLocaleDateString()}</ClientDate>
                       {wo.team_members?.name && <span> · {wo.team_members.name}</span>}
                     </div>
                   </button>
@@ -847,7 +854,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                           <div className="flex-1 min-w-0">
                             <div className="flex items-baseline gap-2 mb-0.5">
                               <span className="text-xs font-semibold text-gray-900">{authorName || 'Someone'}</span>
-                              <span className="text-[10px] text-gray-400">{new Date(comment.created_at).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+                              <span className="text-[10px] text-gray-400"><ClientDate>{new Date(comment.created_at).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</ClientDate></span>
                               {isOwn && (
                                 <button onClick={() => deleteComment(comment.id)}
                                   className="ml-auto text-[10px] text-gray-400 hover:text-red-600">delete</button>
@@ -937,9 +944,9 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                               <span className="text-gray-500">Moved to </span>
                               <span className="font-semibold" style={{ color: to?.color }}>{to?.label || entry.to_stage}</span>
                               <span className="text-gray-500"> on </span>
-                              <span className="text-gray-700">{new Date(entry.changed_at).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: '2-digit' })}</span>
+                              <span className="text-gray-700"><ClientDate>{new Date(entry.changed_at).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: '2-digit' })}</ClientDate></span>
                               <span className="text-gray-500"> at </span>
-                              <span className="text-gray-700">{new Date(entry.changed_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>
+                              <span className="text-gray-700"><ClientDate>{new Date(entry.changed_at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</ClientDate></span>
                               {byName && <><span className="text-gray-500"> by </span><span className="font-medium text-gray-800">{byName}</span></>}
                             </div>
                           </div>
@@ -965,8 +972,8 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
               ) : (
                 <>
                   <div className="pt-3 border-t border-gray-100 text-xs text-gray-400 space-y-0.5">
-                    {wo?.created_at && <div>Created: {new Date(wo.created_at).toLocaleString()}</div>}
-                    {wo?.updated_at && <div>Updated: {new Date(wo.updated_at).toLocaleString()}</div>}
+                    {wo?.created_at && <div>Created: <ClientDate>{new Date(wo.created_at).toLocaleString()}</ClientDate></div>}
+                    {wo?.updated_at && <div>Updated: <ClientDate>{new Date(wo.updated_at).toLocaleString()}</ClientDate></div>}
                     {wo?.id && <div>ID: {wo.id.substring(0, 8)}...</div>}
                   </div>
                   <p className="text-xs text-gray-400 italic pt-2">Changes save automatically when you click outside a field.</p>
