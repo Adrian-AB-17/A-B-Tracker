@@ -278,7 +278,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     setNewWo({ title: '', stage: 'not-started', priority: 'medium',
       occurrence: 'One-time',
       client_id: clients[0]?.id || '', service_id: services[0]?.id || '',
-      owner_id: '', est_cost: 0, add_cost: 0 })
+      owner_id: '', est_cost: 0, add_cost: 0, ad_spend: 0 })
     setSelectedWo({ __new: true } as any)
   }
   async function createWo() {
@@ -292,7 +292,8 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       owner_id: newWo.owner_id || null, stage: newWo.stage || 'not-started',
       priority: newWo.priority || 'medium', occurrence: newWo.occurrence || 'One-time',
       est_cost: newWo.est_cost || 0,
-      add_cost: newWo.add_cost || 0, due_date: newWo.due_date || null,
+      add_cost: newWo.add_cost || 0, ad_spend: newWo.ad_spend || 0,
+      due_date: newWo.due_date || null,
       branch: newWo.branch || null, vendor: newWo.vendor || null,
       deliverables_link: newWo.deliverables_link || null,
       notes_link: newWo.notes_link || null, notes: newWo.notes || null,
@@ -338,7 +339,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const columnTotals = useMemo(() => {
     const out: Record<string, number> = {}
     BOARD_STAGES.forEach(s => {
-      out[s] = (grouped[s] || []).reduce((sum, w) => sum + (w.est_cost || 0) + (w.add_cost || 0), 0)
+      out[s] = (grouped[s] || []).reduce((sum, w) => sum + (w.est_cost || 0) + (w.add_cost || 0) + ((w as any).ad_spend || 0), 0)
     })
     return out
   }, [grouped])
@@ -413,9 +414,9 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
           {card.team_members?.name && <div className="truncate">👤 {card.team_members.name}</div>}
           {card.due_date && <div>📅 <ClientDate>{new Date(card.due_date).toLocaleDateString()}</ClientDate></div>}
         </div>
-        {((card.est_cost || 0) + (card.add_cost || 0) > 0) && (
+        {((card.est_cost || 0) + (card.add_cost || 0) + ((card as any).ad_spend || 0) > 0) && (
           <div className="text-xs font-mono text-gray-700 mt-2 font-semibold">
-            ${((card.est_cost || 0) + (card.add_cost || 0)).toLocaleString()}
+            ${((card.est_cost || 0) + (card.add_cost || 0) + ((card as any).ad_spend || 0)).toLocaleString()}
           </div>
         )}
       </div>
@@ -887,7 +888,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
               {/* ─── Costs ─── */}
               <div className="space-y-3">
                 <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Costs</div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Est. Cost</label>
                     <div className="relative">
@@ -899,6 +900,21 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                       ) : (
                         <input type="number" placeholder="0" defaultValue={wo?.est_cost || ''}
                           onBlur={e => updateWo({ est_cost: parseFloat(e.target.value) || 0 })}
+                          className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Ad Spend</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-2 text-sm text-gray-400">$</span>
+                      {isNew ? (
+                        <input type="number" placeholder="0" value={(newWo as any).ad_spend || ''}
+                          onChange={e => setNewWo({ ...newWo, ad_spend: parseFloat(e.target.value) || 0 } as any)}
+                          className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
+                      ) : (
+                        <input type="number" placeholder="0" defaultValue={(wo as any)?.ad_spend || ''}
+                          onBlur={e => updateWo({ ad_spend: parseFloat(e.target.value) || 0 } as any)}
                           className="w-full text-sm pl-5 pr-2 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
                       )}
                     </div>
@@ -922,7 +938,11 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                 <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
                   <span className="text-xs font-semibold text-gray-500 uppercase">Total</span>
                   <span className="text-xl font-bold font-mono text-gray-900">
-                    ${(((isNew ? newWo.est_cost : wo?.est_cost) || 0) + ((isNew ? newWo.add_cost : wo?.add_cost) || 0)).toLocaleString()}
+                    ${(
+                      ((isNew ? newWo.est_cost : wo?.est_cost) || 0)
+                      + ((isNew ? (newWo as any).ad_spend : (wo as any)?.ad_spend) || 0)
+                      + ((isNew ? newWo.add_cost : wo?.add_cost) || 0)
+                    ).toLocaleString()}
                   </span>
                 </div>
               </div>
