@@ -5,3 +5,6 @@ node_modules/
 .DS_Store
 *.log
 .vercel
+
+# One-off development helper scripts (not for production)
+*.sh
