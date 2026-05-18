@@ -58,6 +58,8 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [mentionDropdown, setMentionDropdown] = useState<{ open: boolean; query: string; position: number }>({ open: false, query: '', position: 0 })
+  const [mentionIndex, setMentionIndex] = useState(0)
   const supabase = createClient()
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -102,20 +104,92 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       .then(({ data }) => setComments(data || []))
   }, [selectedWo, supabase])
 
+  function handleCommentInput(value: string, cursorPos: number) {
+    setNewComment(value)
+    const before = value.substring(0, cursorPos)
+    const m = before.match(/(?:^|\s)@(\w*)$/)
+    if (m) {
+      setMentionDropdown({ open: true, query: m[1].toLowerCase(), position: cursorPos - m[1].length - 1 })
+      setMentionIndex(0)
+    } else {
+      setMentionDropdown({ open: false, query: '', position: 0 })
+    }
+  }
+
+  const mentionCandidates = useMemo(() => {
+    if (!selectedWo || (selectedWo as any).__new) return team
+    const wo = selectedWo as WorkOrder
+    const priorityIds = new Set<string>()
+    if (wo.owner_id) priorityIds.add(wo.owner_id)
+    const priority = team.filter((t: any) => priorityIds.has(t.id))
+    const others = team.filter((t: any) => !priorityIds.has(t.id))
+    return [...priority, ...others]
+  }, [team, selectedWo])
+
+  const mentionMatches = useMemo(() => {
+    const q = mentionDropdown.query
+    return mentionCandidates.filter((t: any) =>
+      t.name.toLowerCase().includes(q)
+    ).slice(0, 6)
+  }, [mentionCandidates, mentionDropdown.query])
+
+  function insertMention(memberName: string) {
+    const cursorPos = mentionDropdown.position + 1 + mentionDropdown.query.length
+    const before = newComment.substring(0, mentionDropdown.position)
+    const after = newComment.substring(cursorPos)
+    const updated = before + '@' + memberName + ' ' + after
+    setNewComment(updated)
+    setMentionDropdown({ open: false, query: '', position: 0 })
+  }
+
+  function extractMentionedIds(body: string): string[] {
+    const ids: string[] = []
+    const seen = new Set<string>()
+    const matches = body.match(/@(\w+)/g) || []
+    matches.forEach(m => {
+      const name = m.substring(1).toLowerCase()
+      const member = team.find((t: any) => t.name.toLowerCase() === name || t.name.toLowerCase().startsWith(name))
+      if (member && member.auth_user_id && !seen.has(member.auth_user_id)) {
+        seen.add(member.auth_user_id)
+        ids.push(member.auth_user_id)
+      }
+    })
+    return ids
+  }
+
   async function postComment() {
     if (!selectedWo || (selectedWo as any).__new) return
     const wo = selectedWo as WorkOrder
     const body = newComment.trim()
     if (!body) return
     setPostingComment(true)
+    const mentionIds = extractMentionedIds(body)
     const { data, error } = await supabase.from('wo_comments')
-      .insert({ work_order_id: wo.id, body, author_id: currentUserId })
+      .insert({ work_order_id: wo.id, body, author_id: currentUserId, mentions: mentionIds })
       .select()
       .single()
     setPostingComment(false)
     if (error) { alert('Failed to post: ' + error.message); return }
     setComments(prev => [...prev, data as Comment])
     setNewComment('')
+    if (mentionIds.length > 0 && data) {
+      const authorName = team.find((t: any) => t.auth_user_id === currentUserId)?.name || 'Someone'
+      const preview = body.substring(0, 120)
+      const notifPayload = mentionIds
+        .filter(uid => uid !== currentUserId)
+        .map(uid => ({
+          user_id: uid,
+          source_type: 'comment',
+          source_id: (data as any).id,
+          work_order_id: wo.id,
+          body_preview: preview,
+          author_name: authorName,
+          link_url: '/dashboard?wo=' + wo.id,
+        }))
+      if (notifPayload.length > 0) {
+        await supabase.from('wo_notifications').insert(notifPayload)
+      }
+    }
   }
 
   async function deleteComment(commentId: string) {
@@ -774,7 +848,15 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                               )}
                             </div>
                             <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
-                              {comment.body}
+                              {comment.body.split(/(@\w+)/g).map((part: string, idx: number) => {
+                                if (part.startsWith('@')) {
+                                  const memberExists = team.some((t: any) => t.name.toLowerCase() === part.substring(1).toLowerCase())
+                                  if (memberExists) {
+                                    return <span key={idx} className="bg-blue-100 text-blue-800 rounded px-1 py-0.5 font-medium">{part}</span>
+                                  }
+                                }
+                                return <span key={idx}>{part}</span>
+                              })}
                             </div>
                           </div>
                         </div>
@@ -782,17 +864,37 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                     })}
                   </div>
                   <div className="flex gap-2">
-                    <textarea value={newComment}
-                      onChange={e => setNewComment(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                          e.preventDefault()
-                          postComment()
-                        }
-                      }}
-                      placeholder="Add a comment... (Cmd+Enter to post)"
-                      rows={2}
-                      className="flex-1 text-sm px-3 py-2 border border-gray-200 rounded-lg resize-none focus:outline-none focus:border-blue-500" />
+                    <div className="flex-1 relative">
+                      <textarea value={newComment}
+                        onChange={e => handleCommentInput(e.target.value, e.target.selectionStart)}
+                        onKeyDown={e => {
+                          if (mentionDropdown.open && mentionMatches.length > 0) {
+                            if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => (i + 1) % mentionMatches.length); return }
+                            if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(i => (i - 1 + mentionMatches.length) % mentionMatches.length); return }
+                            if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention((mentionMatches[mentionIndex] as any).name); return }
+                            if (e.key === 'Escape') { setMentionDropdown({ open: false, query: '', position: 0 }); return }
+                          }
+                          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault()
+                            postComment()
+                          }
+                        }}
+                        placeholder="Add a comment... use @ to mention. (Cmd+Enter to post)"
+                        rows={2}
+                        className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg resize-none focus:outline-none focus:border-blue-500" />
+                      {mentionDropdown.open && mentionMatches.length > 0 && (
+                        <div className="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[200px] max-h-56 overflow-y-auto">
+                          {mentionMatches.map((m: any, idx: number) => (
+                            <button key={m.id} onClick={() => insertMention(m.name)}
+                              onMouseEnter={() => setMentionIndex(idx)}
+                              className={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 ${idx === mentionIndex ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ background: '#2d4a7c' }}>{m.name[0]}</div>
+                              <span className="font-medium">{m.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-end mt-2">
                     <button onClick={postComment}

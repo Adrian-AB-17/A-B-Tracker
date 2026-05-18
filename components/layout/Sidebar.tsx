@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
+import MentionBadge from './MentionBadge'
 
 const NAV = [
   { href: '/dashboard',           label: 'Board',           icon: '⬜' },
@@ -9,6 +10,7 @@ const NAV = [
   { href: '/dashboard/clients',   label: 'Clients',         icon: '🏢', adminOnly: true },
   { href: '/dashboard/services',  label: 'Services',        icon: '⚙️',  adminOnly: true },
   { href: '/dashboard/tasks',     label: 'My Tasks',        icon: '✓' },
+  { href: '/dashboard/mentions',  label: 'My Mentions',     icon: '@' },
   { href: '/dashboard/recent',    label: 'Recent Changes',  icon: '🔔' },
   { href: '/dashboard/all',       label: 'All Work Orders', icon: '☰' },
 ]
@@ -72,6 +74,7 @@ export default function Sidebar({ member }: { member: any }) {
                 style={active ? { background: '#1a2b4a' } : {}}>
                 <span className="text-base">{item.icon}</span>
                 {item.label}
+                {item.href === '/dashboard/mentions' && <MentionBadge />}
               </a>
             )
           })}
