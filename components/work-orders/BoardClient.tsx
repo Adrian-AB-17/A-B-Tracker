@@ -5,6 +5,7 @@ import { STAGES, type WorkOrder, type WoStage } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import { useViewMode } from '@/lib/useViewMode'
 import { ACTIVE_DELIVERY_STAGES, isStale, isOverdue } from '@/lib/sla'
+import WoLineItemsSection from './WoLineItemsSection'
 
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: 'bg-red-50 text-red-700 border-red-200',
@@ -60,10 +61,11 @@ function ClientDate({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export default function BoardClient({ initialWorkOrders, clients, services, team, taskAggregates, assignmentsByWo, currentMember }: {
+export default function BoardClient({ initialWorkOrders, clients, services, team, taskAggregates, assignmentsByWo, lineItemTotalsByWo, currentMember }: {
   initialWorkOrders: WorkOrder[]; clients: any[]; services: any[]; team: any[];
   taskAggregates?: Record<string, { total: number; done: number; overdue: number }>;
   assignmentsByWo?: Record<string, string[]>;
+  lineItemTotalsByWo?: Record<string, number>;
   currentMember?: { id: string; role: string } | null;
 }) {
   const isAdmin = currentMember?.role === 'admin'
@@ -81,6 +83,11 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [filterOwner, setFilterOwner] = useState('')
   const [selectedWo, setSelectedWo] = useState<WoOrNew | null>(null)
 
+  // Line items subtotal for the currently-open WO panel. Updated by
+  // WoLineItemsSection via its onTotalChange callback. Falls back to the
+  // server-loaded aggregate when the panel hasn't loaded items yet.
+  const [openWoLineItemTotal, setOpenWoLineItemTotal] = useState<number | null>(null)
+
   // ----- URL-driven sidebar filters -----
   const urlAssignedToMe       = searchParams.get('assignedToMe') === '1'
   const urlOwnedByMe          = searchParams.get('ownedByMe') === '1'
@@ -95,12 +102,10 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const hasUrlFilters = urlAssignedToMe || urlOwnedByMe || urlFlagged || urlStale ||
     urlOverdue || urlActiveOnly || urlOverdueOrFlagged || !!urlClient || !!urlStage
 
-  // Clear URL filters helper
   function clearUrlFilters() {
     router.push(pathname)
   }
 
-  // Build a human-readable summary of the active URL filter(s)
   function activeFilterSummary(): string {
     const parts: string[] = []
     if (urlAssignedToMe) parts.push('assigned to me')
@@ -149,7 +154,12 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [togglingAssignee, setTogglingAssignee] = useState<string | null>(null)
   const supabase = createClient()
 
-  // Auto-open WO from ?wo=X param (when arriving from Clients or All Work Orders)
+  // Reset line item total state when WO panel switches
+  useEffect(() => {
+    setOpenWoLineItemTotal(null)
+  }, [selectedWo])
+
+  // Auto-open WO from ?wo=X param
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
@@ -158,7 +168,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       const found = workOrders.find(w => w.id === woId)
       if (found) {
         setSelectedWo(found)
-        // Clear only the wo param, keep other filter params
         params.delete('wo')
         const qs = params.toString()
         window.history.replaceState({}, '', `/dashboard${qs ? '?' + qs : ''}`)
@@ -168,7 +177,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   }, [workOrders.length])
 
 
-  // Load stage history when a non-new WO is selected
   useEffect(() => {
     if (!selectedWo || (selectedWo as any).__new) { setStageHistory([]); return }
     const wo = selectedWo as WorkOrder
@@ -180,7 +188,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       .then(({ data }) => setStageHistory(data || []))
   }, [selectedWo, supabase])
 
-  // Load comments when a non-new WO is selected
   useEffect(() => {
     if (!selectedWo || (selectedWo as any).__new) { setComments([]); return }
     const wo = selectedWo as WorkOrder
@@ -191,7 +198,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       .then(({ data }) => setComments(data || []))
   }, [selectedWo, supabase])
 
-  // Load tasks when a non-new WO is selected
   useEffect(() => {
     if (!selectedWo || (selectedWo as any).__new) { setTasks([]); return }
     const wo = selectedWo as WorkOrder
@@ -202,7 +208,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       .then(({ data }) => setTasks((data || []) as Task[]))
   }, [selectedWo, supabase])
 
-  // Load assignees when a non-new WO is selected
   useEffect(() => {
     if (!selectedWo || (selectedWo as any).__new) { setAssignees([]); return }
     const wo = selectedWo as WorkOrder
@@ -367,7 +372,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     const { error } = await supabase.from('wo_tasks').update(patch).eq('id', taskId)
     if (error) {
       alert('Failed to update task: ' + error.message)
-      // Reload to recover from optimistic update mismatch
       if (selectedWo && !(selectedWo as any).__new) {
         const wo = selectedWo as WorkOrder
         const { data } = await supabase.from('wo_tasks').select('*').eq('work_order_id', wo.id).order('sort_order', { ascending: true })
@@ -389,7 +393,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     const isAssigned = assignees.includes(teamMemberId)
     setTogglingAssignee(teamMemberId)
     if (isAssigned) {
-      // optimistic remove
       setAssignees(prev => prev.filter(id => id !== teamMemberId))
       const { error } = await supabase.from('wo_assignees')
         .delete()
@@ -397,16 +400,15 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
         .eq('team_member_id', teamMemberId)
       if (error) {
         alert('Failed to remove: ' + error.message)
-        setAssignees(prev => [...prev, teamMemberId]) // rollback
+        setAssignees(prev => [...prev, teamMemberId])
       }
     } else {
-      // optimistic add
       setAssignees(prev => [...prev, teamMemberId])
       const { error } = await supabase.from('wo_assignees')
         .insert({ work_order_id: wo.id, team_member_id: teamMemberId })
       if (error) {
         alert('Failed to assign: ' + error.message)
-        setAssignees(prev => prev.filter(id => id !== teamMemberId)) // rollback
+        setAssignees(prev => prev.filter(id => id !== teamMemberId))
       }
     }
     setTogglingAssignee(null)
@@ -416,13 +418,11 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
 
   const filtered = useMemo(() => {
     return workOrders.filter(wo => {
-      // Existing in-page filters (search bar + top dropdowns)
       if (search && !wo.title.toLowerCase().includes(search.toLowerCase())) return false
       if (filterClient && wo.client_id !== filterClient) return false
       if (filterService && wo.service_id !== filterService) return false
       if (filterOwner && wo.owner_id !== filterOwner) return false
 
-      // URL-driven sidebar / KPI tile filters (AND logic)
       if (urlAssignedToMe) {
         if (!currentMember?.id) return false
         const woAssignees = assignmentsByWo?.[wo.id] || []
@@ -473,7 +473,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     const { data, error } = await supabase.from('work_orders').update({ stage: newStage }).eq('id', woId).select()
     if (error) {
       alert('Move failed: ' + error.message)
-      setWorkOrders(prevState) // rollback
+      setWorkOrders(prevState)
     }
   }
 
@@ -488,7 +488,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     setSaving(false)
     setJustSaved(true)
     setTimeout(() => setJustSaved(false), 2000)
-    // Refresh history if stage changed
     if (patch.stage) {
       const { data } = await supabase.from('wo_stage_history')
         .select('*').eq('work_order_id', wo.id)
@@ -553,7 +552,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     setSelectedWo(null); setNewWo({})
   }
 
-  // Today's Due + Overdue work orders (active stages only)
   const dueAlerts = useMemo(() => {
     if (!mounted) return { dueToday: [], overdue: [] }
     const now = new Date()
@@ -569,7 +567,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       if (dd >= todayStart && dd < todayEnd) dueToday.push(wo)
       else if (dd < todayStart) overdue.push(wo)
     })
-    // Sort overdue by oldest first
     overdue.sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
     return { dueToday, overdue }
   }, [workOrders, mounted])
@@ -581,13 +578,22 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     return out
   }, [filtered])
 
+  // Helper: total cost for a single card/WO, including server-loaded line items.
+  function cardCost(w: WorkOrder): number {
+    return (w.est_cost || 0)
+      + (w.add_cost || 0)
+      + ((w as any).ad_spend || 0)
+      + (lineItemTotalsByWo?.[w.id] || 0)
+  }
+
   const columnTotals = useMemo(() => {
     const out: Record<string, number> = {}
     BOARD_STAGES.forEach(s => {
-      out[s] = (grouped[s] || []).reduce((sum, w) => sum + (w.est_cost || 0) + (w.add_cost || 0) + ((w as any).ad_spend || 0), 0)
+      out[s] = (grouped[s] || []).reduce((sum, w) => sum + cardCost(w), 0)
     })
     return out
-  }, [grouped])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grouped, lineItemTotalsByWo])
 
   function handleDragStart(e: React.DragEvent, woId: string) { setDraggedId(woId); e.dataTransfer.effectAllowed = 'move' }
   function handleDragEnd() { setDraggedId(null); setDragOverStage(null) }
@@ -608,14 +614,12 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const wo = selectedWo as WorkOrder | null
   const activeFilterCount = [filterClient, filterService, filterOwner].filter(Boolean).length
 
-  // Team name lookup for stage history
   const teamById = useMemo(() => {
     const map: Record<string, string> = {}
     team.forEach((t: any) => { map[t.id] = t.name })
     return map
   }, [team])
 
-  // Group services by category for the picker. Recurring categories sorted before One-time.
   const servicesByCategory = useMemo(() => {
     const groups: Record<string, any[]> = {}
     services.forEach((s: any) => {
@@ -623,15 +627,12 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       if (!groups[key]) groups[key] = []
       groups[key].push(s)
     })
-    // Sort each group by name
     Object.values(groups).forEach(list => list.sort((a, b) => a.name.localeCompare(b.name)))
-    // Return groups sorted alphabetically by category
     return Object.fromEntries(
       Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]))
     )
   }, [services])
 
-  // Auth user → team_member lookup so we can show "by Adrian" in history
   const [authUserMap, setAuthUserMap] = useState<Record<string, string>>({})
   useEffect(() => {
     supabase.from('team_members').select('id, name, auth_user_id').then(({ data }) => {
@@ -642,7 +643,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     })
   }, [supabase])
 
-  // Get current user id for comment authorship
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setCurrentUserId(data.user?.id || null)
@@ -678,7 +678,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
           borderLeftColor: flagged ? 'var(--red)' : priorityColor,
         }}>
 
-        {/* Top row: WO-ID + priority badge */}
         <div className="flex items-center justify-between gap-2 mb-1">
           <span className="font-mono text-[10px] tracking-wider" style={{ color: 'var(--text-faint)' }}>
             {card.id.startsWith('WO-') ? card.id : `WO-${card.id.substring(0, 8)}`}
@@ -688,13 +687,11 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
           </span>
         </div>
 
-        {/* Title */}
         <div className="text-[13px] font-[550] leading-snug line-clamp-2 mb-1.5" style={{ color: 'var(--brand-navy)', letterSpacing: '-0.005em' }}>
           {flagged && <span className="mr-1" style={{ color: 'var(--red)' }} title="Flagged with issue">⚑</span>}
           {card.title}
         </div>
 
-        {/* Pill tags row */}
         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
           {card.clients?.name && (
             <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'var(--blue-soft)', color: 'var(--blue)' }}>
@@ -713,14 +710,12 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
           )}
         </div>
 
-        {/* Due date */}
         {card.due_date && (
           <div className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
             📅 <span className="font-mono tabular-nums"><ClientDate>{new Date(card.due_date).toLocaleDateString()}</ClientDate></span>
           </div>
         )}
 
-        {/* Task tag (Batch 7) */}
         {(() => {
           const agg = taskAggregates?.[card.id]
           if (!agg || agg.total === 0) return null
@@ -745,7 +740,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
           )
         })()}
 
-        {/* Avatar stack (Batch 7) + footer with cost */}
         {(() => {
           const ownerId = card.owner_id
           const assigneeIds = assignmentsByWo?.[card.id] || []
@@ -759,7 +753,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
             const name = teamById[aid] || '?'
             ordered.push({ id: aid, name, isOwner: false })
           })
-          const cost = (card.est_cost || 0) + (card.add_cost || 0) + ((card as any).ad_spend || 0)
+          const cost = cardCost(card)
           if (ordered.length === 0) {
             return (
               <div className="flex items-center justify-between mt-2">
@@ -816,6 +810,16 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       </div>
     )
   }
+
+  // Compute the live line-item subtotal for the open WO. While the panel is
+  // open and the section has reported its current sum via onTotalChange, use
+  // that. Otherwise fall back to the server aggregate.
+  const openWoLineItemSubtotal = useMemo(() => {
+    if (!selectedWo || (selectedWo as any).__new) return 0
+    if (openWoLineItemTotal != null) return openWoLineItemTotal
+    const w = selectedWo as WorkOrder
+    return lineItemTotalsByWo?.[w.id] || 0
+  }, [selectedWo, openWoLineItemTotal, lineItemTotalsByWo])
 
   return (
     <div className="h-full flex flex-col" style={{ background: 'var(--bg)' }}>
@@ -924,7 +928,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
         )}
       </div>
 
-      {/* Today's Due + Overdue widget (desktop) */}
       {mounted && (dueAlerts.dueToday.length > 0 || dueAlerts.overdue.length > 0) && (
         <div className="hidden md:flex gap-3 px-6 pt-4 pb-2">
           {dueAlerts.overdue.length > 0 && (
@@ -985,11 +988,10 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
         </div>
       )}
 
-      {/* Today's Due + Overdue widget (mobile) */}
       {mounted && (dueAlerts.dueToday.length > 0 || dueAlerts.overdue.length > 0) && (
         <div className="md:hidden px-3 pt-3 pb-1 space-y-2">
           {dueAlerts.overdue.length > 0 && (
-            <button onClick={() => {/* could filter to overdue */}}
+            <button onClick={() => {}}
               className="w-full bg-red-50 border border-red-200 rounded-lg p-2.5 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span>⚠️</span>
@@ -1146,7 +1148,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                           const newServiceId = e.target.value
                           const picked = services.find((s: any) => s.id === newServiceId)
                           const patch: any = { service_id: newServiceId }
-                          // Auto-fill due date from service's lead time on new WOs only
                           if (picked?.lead_time_days != null) {
                             const target = new Date()
                             target.setDate(target.getDate() + picked.lead_time_days)
@@ -1181,7 +1182,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                         ))}
                       </select>
                     )}
-                    {/* Description hint under dropdown if a service is selected */}
                     {(() => {
                       const sid = isNew ? newWo.service_id : wo?.service_id
                       const picked = services.find((s: any) => s.id === sid)
@@ -1236,7 +1236,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
               <div className="space-y-3">
                 <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Ownership &amp; Priority</div>
 
-                {/* Assigned To (multi-select chip list) */}
                 {isNew ? (
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">
@@ -1439,6 +1438,17 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                     </div>
                   </div>
                 </div>
+
+                {/* Line items — existing WOs only */}
+                {!isNew && wo?.id && (
+                  <div className="pt-2">
+                    <WoLineItemsSection
+                      workOrderId={wo.id}
+                      onTotalChange={setOpenWoLineItemTotal}
+                    />
+                  </div>
+                )}
+
                 <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
                   <span className="text-xs font-semibold text-gray-500 uppercase">Total</span>
                   <span className="text-xl font-bold font-mono text-gray-900">
@@ -1446,7 +1456,8 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                       ((isNew ? newWo.est_cost : wo?.est_cost) || 0)
                       + ((isNew ? (newWo as any).ad_spend : (wo as any)?.ad_spend) || 0)
                       + ((isNew ? newWo.add_cost : wo?.add_cost) || 0)
-                    ).toLocaleString()}
+                      + (isNew ? 0 : openWoLineItemSubtotal)
+                    ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
@@ -1456,7 +1467,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
               <div className="space-y-3">
                 <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Details</div>
 
-                {/* Flag with issue */}
                 <div className={`rounded-lg border ${
                   (isNew ? (newWo as any).flagged : (wo as any)?.flagged)
                     ? 'border-red-200 bg-red-50'
@@ -1585,7 +1595,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                         isDueToday ? 'border-amber-200 bg-amber-50/40' :
                         'border-gray-200 bg-white'
                       }`}>
-                        {/* Row 1: checkbox + description */}
                         <div className="flex items-start gap-2">
                           <input
                             type="checkbox"
@@ -1610,7 +1619,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                             title="Delete task">×</button>
                         </div>
 
-                        {/* Row 2: meta grid */}
                         <div className="grid grid-cols-3 gap-2 pl-6">
                           <div>
                             <label className="block text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Assignee</label>
@@ -1645,7 +1653,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                           </div>
                         </div>
 
-                        {/* Row 3: status + link + notes inputs */}
                         <div className="grid grid-cols-2 gap-2 pl-6">
                           <div>
                             <label className="block text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Status</label>
@@ -1670,7 +1677,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                           </div>
                         </div>
 
-                        {/* Row 4: notes */}
                         <div className="pl-6">
                           <label className="block text-[10px] text-gray-400 uppercase font-semibold mb-0.5">Notes</label>
                           <textarea
@@ -1687,7 +1693,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                     )
                   })}
 
-                  {/* Add task input */}
                   <div className="flex gap-2 pt-1">
                     <input
                       type="text"
@@ -1889,7 +1894,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                   </div>
                   <p className="text-xs text-gray-400 italic pt-2">Changes save automatically when you click outside a field.</p>
 
-                  {/* Archive + Delete buttons */}
                   <div className="pt-4 border-t border-gray-100 flex gap-2">
                     {wo?.stage !== 'archived' && (
                       <button onClick={archiveWo} disabled={saving}

@@ -49,3 +49,15 @@ export interface WorkOrder {
   services?: { name: string; category: string }
   team_members?: { name: string }
 }
+
+export interface WoLineItem {
+  id: string
+  work_order_id: string
+  description: string
+  qty: number
+  unit_price: number
+  total: number
+  sort_order: number
+  created_at: string
+  created_by?: string | null
+}

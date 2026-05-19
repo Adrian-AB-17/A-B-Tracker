@@ -32,9 +32,6 @@ export default async function DashboardPage() {
     .from('team_members').select('id, name, role, auth_user_id').order('name')
 
   // Load all tasks for the visible work orders, then aggregate in-process.
-  // We avoid a SQL GROUP BY here because PostgREST doesn't expose aggregates
-  // cleanly through @supabase/supabase-js; doing it in JS keeps the data
-  // contract simple and the cost is negligible (a few thousand rows max).
   const woIds = (workOrders || []).map(w => w.id)
   const today = new Date().toISOString().substring(0, 10)
 
@@ -72,6 +69,23 @@ export default async function DashboardPage() {
     assignmentsByWo[a.work_order_id].push(a.team_member_id)
   })
 
+  // Load line item totals per WO. Admins only — RLS will return empty for
+  // non-admins, so the lineItemTotalsByWo map stays empty for them. The
+  // generated `total` column on wo_line_items already does the qty * unit_price
+  // math; we just sum it per WO here.
+  type LineItemRow = { work_order_id: string; total: number }
+  const { data: lineItemRows } = woIds.length
+    ? await supabase
+        .from('wo_line_items')
+        .select('work_order_id, total')
+        .in('work_order_id', woIds)
+    : { data: [] as LineItemRow[] }
+
+  const lineItemTotalsByWo: Record<string, number> = {}
+  ;(lineItemRows || []).forEach((r: LineItemRow) => {
+    lineItemTotalsByWo[r.work_order_id] = (lineItemTotalsByWo[r.work_order_id] || 0) + (r.total || 0)
+  })
+
   return (
     <BoardClient
       initialWorkOrders={workOrders || []}
@@ -80,6 +94,7 @@ export default async function DashboardPage() {
       team={team || []}
       taskAggregates={taskAggregates}
       assignmentsByWo={assignmentsByWo}
+      lineItemTotalsByWo={lineItemTotalsByWo}
       currentMember={currentMember}
     />
   )
