@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useViewMode } from '@/lib/useViewMode'
+import { STALE_DAYS } from '@/lib/sla'
 
 type StageDistRow = {
   id: string
@@ -27,6 +28,7 @@ export default function PipelineClient({
   stageDistribution,
   maxCount,
   activeCount,
+  notDoneCount,
   archivedCount,
   staleCount,
   criticallyStaleCount,
@@ -34,12 +36,15 @@ export default function PipelineClient({
   overdueCount,
   flaggedCount,
   inApprovalCount,
+  readyToInvoiceCount,
+  invoicedCount,
   alerts,
 }: {
   currentMember: { id: string; role: string } | null
   stageDistribution: StageDistRow[]
   maxCount: number
   activeCount: number
+  notDoneCount: number
   archivedCount: number
   staleCount: number
   criticallyStaleCount: number
@@ -47,6 +52,8 @@ export default function PipelineClient({
   overdueCount: number
   flaggedCount: number
   inApprovalCount: number
+  readyToInvoiceCount: number
+  invoicedCount: number
   alerts: AlertRow[]
 }) {
   const isAdmin = currentMember?.role === 'admin'
@@ -76,48 +83,119 @@ export default function PipelineClient({
         <p className="text-sm text-gray-500 mt-1">SLA-driven view of what needs attention</p>
       </div>
 
-      {/* 4 KPI cards — same layout for admin and team (no $ in any of them) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {/* KPI cards: 4 for team, 6 for admin (2 extra: Ready to Invoice + Invoiced) */}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${showCosts ? 'lg:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-4'} gap-4 mb-6`}>
+        {/* Card 1: Active */}
         <div className="bg-white rounded-lg border border-gray-200 p-5">
-          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Active Work Orders</div>
+          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Active</div>
           <div className="text-3xl font-bold mt-1">{activeCount}</div>
           <div className="text-xs text-gray-400 mt-1">
-            {activeCount + archivedCount} total · {archivedCount} archived
+            of {notDoneCount} open · {archivedCount} archived
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-5"
-             style={{ borderColor: staleCount > 0 ? '#f59e0b40' : undefined }}>
-          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Stale (Past SLA)</div>
-          <div className="text-3xl font-bold mt-1" style={{ color: staleCount > 0 ? '#b45309' : undefined }}>
+        {/* Card 2: Stale */}
+        <div
+          className="bg-white rounded-lg border border-gray-200 p-5"
+          style={{ borderColor: staleCount > 0 ? '#f59e0b40' : undefined }}
+        >
+          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">
+            Stale ({STALE_DAYS}d+)
+          </div>
+          <div
+            className="text-3xl font-bold mt-1"
+            style={{ color: staleCount > 0 ? '#b45309' : undefined }}
+          >
             {staleCount}
           </div>
-          <div className="text-xs mt-1" style={{ color: criticallyStaleCount > 0 ? '#dc2626' : '#9ca3af' }}>
-            {criticallyStaleCount > 0 ? `${criticallyStaleCount} critically overdue` : 'All within threshold'}
+          <div
+            className="text-xs mt-1"
+            style={{ color: criticallyStaleCount > 0 ? '#dc2626' : '#9ca3af' }}
+          >
+            {criticallyStaleCount > 0
+              ? `${criticallyStaleCount} critically overdue`
+              : 'All within threshold'}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-5"
-             style={{ borderColor: overdueOrFlaggedCount > 0 ? '#dc262640' : undefined }}>
-          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Overdue or Flagged</div>
-          <div className="text-3xl font-bold mt-1" style={{ color: overdueOrFlaggedCount > 0 ? '#dc2626' : undefined }}>
+        {/* Card 3: Overdue or Flagged */}
+        <div
+          className="bg-white rounded-lg border border-gray-200 p-5"
+          style={{ borderColor: overdueOrFlaggedCount > 0 ? '#dc262640' : undefined }}
+        >
+          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">
+            Overdue or Flagged
+          </div>
+          <div
+            className="text-3xl font-bold mt-1"
+            style={{ color: overdueOrFlaggedCount > 0 ? '#dc2626' : undefined }}
+          >
             {overdueOrFlaggedCount}
           </div>
-          <div className="text-xs mt-1" style={{ color: overdueOrFlaggedCount > 0 ? '#dc2626' : '#9ca3af' }}>
+          <div
+            className="text-xs mt-1"
+            style={{ color: overdueOrFlaggedCount > 0 ? '#dc2626' : '#9ca3af' }}
+          >
             {overdueCount} past due · {flaggedCount} flagged
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-5"
-             style={{ borderColor: inApprovalCount > 0 ? '#7c3aed40' : undefined }}>
+        {/* Card 4: In Approval */}
+        <div
+          className="bg-white rounded-lg border border-gray-200 p-5"
+          style={{ borderColor: inApprovalCount > 0 ? '#7c3aed40' : undefined }}
+        >
           <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">In Approval</div>
-          <div className="text-3xl font-bold mt-1" style={{ color: inApprovalCount > 0 ? '#7c3aed' : undefined }}>
+          <div
+            className="text-3xl font-bold mt-1"
+            style={{ color: inApprovalCount > 0 ? '#7c3aed' : undefined }}
+          >
             {inApprovalCount}
           </div>
           <div className="text-xs text-gray-400 mt-1">
             {inApprovalCount > 0 ? 'Waiting on client review' : 'Nothing in approval'}
           </div>
         </div>
+
+        {/* Admin-only Card 5: Ready to Invoice */}
+        {showCosts && (
+          <div
+            className="bg-white rounded-lg border border-gray-200 p-5"
+            style={{ borderColor: readyToInvoiceCount > 0 ? '#10b98140' : undefined }}
+          >
+            <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">
+              Ready to Invoice
+            </div>
+            <div
+              className="text-3xl font-bold mt-1"
+              style={{ color: readyToInvoiceCount > 0 ? '#059669' : undefined }}
+            >
+              {readyToInvoiceCount}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              {readyToInvoiceCount > 0 ? 'Approved + executed' : 'Nothing to invoice'}
+            </div>
+          </div>
+        )}
+
+        {/* Admin-only Card 6: Invoiced */}
+        {showCosts && (
+          <div
+            className="bg-white rounded-lg border border-gray-200 p-5"
+            style={{ borderColor: invoicedCount > 0 ? '#d99e2b40' : undefined }}
+          >
+            <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Invoiced</div>
+            <div
+              className="text-3xl font-bold mt-1"
+              style={{ color: invoicedCount > 0 ? '#d99e2b' : undefined }}
+            >
+              {invoicedCount}
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              {invoicedCount > 0 ? 'Awaiting payment' : 'No outstanding invoices'}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Two-column row: stage distribution (left, wider) + alerts panel (right) */}
@@ -145,13 +223,17 @@ export default function PipelineClient({
                         {s.oldestDays}d
                       </span>
                       {showCosts && (
-                        <span className="font-semibold text-gray-900 w-28 text-right">${s.value.toLocaleString()}</span>
+                        <span className="font-semibold text-gray-900 w-28 text-right">
+                          ${s.value.toLocaleString()}
+                        </span>
                       )}
                     </div>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all"
-                         style={{ width: `${pct}%`, background: s.color }} />
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${pct}%`, background: s.color }}
+                    />
                   </div>
                 </div>
               )

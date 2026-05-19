@@ -1,12 +1,23 @@
 import type { WorkOrder, WoStage } from './types'
 
 /**
- * SLA threshold (days in stage) per WO stage.
- * Pipeline Health "Stale" KPI = WOs where daysInStage >= STAGE_SLAS[stage].
- * Critically stale = daysInStage >= 2 × SLA.
- * Stages 'paid' and 'archived' are sentinel (999) — never stale.
+ * Flat staleness threshold (days). A WO is "stale" if it's been in its
+ * current stage for STALE_DAYS or more (excluding paid/archived).
+ * "Critically stale" = 2 × STALE_DAYS (i.e. 20d).
  *
- * Source: v7 handoff, Session 6 plan.
+ * Chosen over per-stage SLAs (Session 6, May 19 2026) for simplicity:
+ * one number to communicate, one number to remember.
+ */
+export const STALE_DAYS = 10
+export const CRITICALLY_STALE_DAYS = STALE_DAYS * 2
+
+/**
+ * Per-stage SLA values (legacy / reference only).
+ * Kept as a constant so future code can opt into per-stage behavior
+ * (e.g. per-client SLA overrides, per-stage alerts), but the live
+ * KPI + alerts logic uses STALE_DAYS above.
+ *
+ * Stages 'paid' and 'archived' are sentinel (999) — never stale.
  */
 export const STAGE_SLAS: Record<WoStage, number> = {
   'submitted': 2,
@@ -24,6 +35,23 @@ export const STAGE_SLAS: Record<WoStage, number> = {
 }
 
 /**
+ * Stages considered "actively in delivery."
+ * Used by the Active KPI on Pipeline Health (Session 6 spec):
+ * the team is currently doing the work for these WOs.
+ *
+ * Explicitly excludes: submitted, not-started, on-hold (not started yet),
+ * invoiced (delivered, waiting on payment), paid, archived (done).
+ */
+export const ACTIVE_DELIVERY_STAGES: WoStage[] = [
+  'in-progress',
+  'deliverables-completed',
+  'sent-for-approval',
+  'revisions-received',
+  'approved',
+  'deliverables-executed',
+]
+
+/**
  * Days the WO has been in its current stage.
  * Uses stage_entered_at (set by the wo_stage_changed trigger) and falls back
  * to submitted_at if the column is null (shouldn't happen after backfill,
@@ -37,23 +65,21 @@ export function daysInStage(wo: Pick<WorkOrder, 'stage_entered_at' | 'submitted_
 }
 
 /**
- * True if the WO has been in its current stage at or beyond the SLA threshold.
+ * True if the WO has been in its current stage at or beyond STALE_DAYS.
  * Never returns true for 'paid' or 'archived'.
  */
 export function isStale(wo: Pick<WorkOrder, 'stage' | 'stage_entered_at' | 'submitted_at'>): boolean {
   if (wo.stage === 'paid' || wo.stage === 'archived') return false
-  const sla = STAGE_SLAS[wo.stage] ?? 0
-  return daysInStage(wo) >= sla
+  return daysInStage(wo) >= STALE_DAYS
 }
 
 /**
- * True if days-in-stage is at or beyond 2× the SLA threshold.
+ * True if days-in-stage is at or beyond CRITICALLY_STALE_DAYS (20d).
  * Implies isStale(wo) is also true. Drives red highlighting in alerts.
  */
 export function isCriticallyStale(wo: Pick<WorkOrder, 'stage' | 'stage_entered_at' | 'submitted_at'>): boolean {
   if (wo.stage === 'paid' || wo.stage === 'archived') return false
-  const sla = STAGE_SLAS[wo.stage] ?? 0
-  return daysInStage(wo) >= sla * 2
+  return daysInStage(wo) >= CRITICALLY_STALE_DAYS
 }
 
 /**
