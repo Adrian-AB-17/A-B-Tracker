@@ -4,6 +4,12 @@ import BoardClient from '@/components/work-orders/BoardClient'
 export default async function DashboardPage() {
   const supabase = createClient()
 
+  // Current user's team_member row — needed so BoardClient knows if it's an admin
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: currentMember } = user
+    ? await supabase.from('team_members').select('id, role').eq('auth_user_id', user.id).maybeSingle()
+    : { data: null }
+
   const { data: workOrders } = await supabase
     .from('work_orders')
     .select(`
@@ -74,6 +80,7 @@ export default async function DashboardPage() {
       team={team || []}
       taskAggregates={taskAggregates}
       assignmentsByWo={assignmentsByWo}
+      currentMember={currentMember}
     />
   )
 }
