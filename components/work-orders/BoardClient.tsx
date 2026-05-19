@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from 'react'
 // removed unused next/navigation imports
 import { STAGES, type WorkOrder, type WoStage } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
+import { useViewMode } from '@/lib/useViewMode'
 
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: 'bg-red-50 text-red-700 border-red-200',
@@ -58,11 +59,15 @@ function ClientDate({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export default function BoardClient({ initialWorkOrders, clients, services, team, taskAggregates, assignmentsByWo }: {
+export default function BoardClient({ initialWorkOrders, clients, services, team, taskAggregates, assignmentsByWo, currentMember }: {
   initialWorkOrders: WorkOrder[]; clients: any[]; services: any[]; team: any[];
   taskAggregates?: Record<string, { total: number; done: number; overdue: number }>;
   assignmentsByWo?: Record<string, string[]>;
+  currentMember?: { id: string; role: string } | null;
 }) {
+  const isAdmin = currentMember?.role === 'admin'
+  const [viewMode] = useViewMode(isAdmin)
+  const showCosts = viewMode === 'admin'
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>(initialWorkOrders)
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
@@ -254,6 +259,35 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     const { error } = await supabase.from('wo_comments').delete().eq('id', commentId)
     if (error) { alert('Failed to delete: ' + error.message); return }
     setComments(prev => prev.filter(c => c.id !== commentId))
+  }
+
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editingCommentBody, setEditingCommentBody] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
+
+  function startEditComment(c: { id: string; body: string }) {
+    setEditingCommentId(c.id)
+    setEditingCommentBody(c.body)
+  }
+
+  function cancelEditComment() {
+    setEditingCommentId(null)
+    setEditingCommentBody('')
+  }
+
+  async function saveCommentEdit() {
+    if (!editingCommentId) return
+    const body = editingCommentBody.trim()
+    if (!body) { alert('Comment cannot be empty.'); return }
+    setSavingEdit(true)
+    const { error } = await supabase.from('wo_comments')
+      .update({ body, edited_at: new Date().toISOString() })
+      .eq('id', editingCommentId)
+    setSavingEdit(false)
+    if (error) { alert('Failed to save: ' + error.message); return }
+    setComments(prev => prev.map(c => c.id === editingCommentId ? { ...c, body, edited_at: new Date().toISOString() } as any : c))
+    setEditingCommentId(null)
+    setEditingCommentBody('')
   }
 
   async function addTask() {
@@ -639,7 +673,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
             return (
               <div className="flex items-center justify-between mt-2">
                 <span className="text-[11px] italic" style={{ color: 'var(--text-faint)' }}>Unassigned</span>
-                {cost > 0 && (
+                {showCosts && cost > 0 && (
                   <span className="text-[11px] font-mono tabular-nums font-semibold px-1.5 py-0.5 rounded"
                     style={{ background: 'var(--brand-accent-soft)', color: 'var(--brand-navy)' }}>
                     ${cost.toLocaleString()}
@@ -679,7 +713,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                 </div>
                 <span className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>{footer}</span>
               </div>
-              {cost > 0 && (
+              {showCosts && cost > 0 && (
                 <span className="text-[11px] font-mono tabular-nums font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
                   style={{ background: 'var(--brand-accent-soft)', color: 'var(--brand-navy)' }}>
                   ${cost.toLocaleString()}
@@ -774,7 +808,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
           )}
           {(grouped[mobileStage] || []).map(card => renderCard(card))}
         </div>
-        {columnTotals[mobileStage] > 0 && (
+        {showCosts && columnTotals[mobileStage] > 0 && (
           <div className="bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between">
             <span className="text-xs text-gray-500 uppercase font-semibold">Column Total</span>
             <span className="font-mono font-bold text-gray-900">${columnTotals[mobileStage].toLocaleString()}</span>
@@ -897,7 +931,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                     </div>
                     <span className="text-[11px] font-mono tabular-nums px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}>{cards.length}</span>
                   </div>
-                  {total > 0 && (
+                  {showCosts && total > 0 && (
                     <div className="text-[11px] mt-1 font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>${total.toLocaleString()}</div>
                   )}
                 </div>
@@ -1247,6 +1281,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
               </div>
 
               {/* ─── Costs ─── */}
+              {showCosts && (
               <div className="space-y-3">
                 <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Costs</div>
                 <div className="grid grid-cols-3 gap-3">
@@ -1307,6 +1342,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                   </span>
                 </div>
               </div>
+              )}
 
               {/* ─── Details ─── */}
               <div className="space-y-3">
@@ -1578,6 +1614,8 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                       const authorName = comment.author_id ? authUserMap[comment.author_id] : 'Someone'
                       const isOwn = comment.author_id === currentUserId
                       const initials = (authorName || '?')[0].toUpperCase()
+                      const isEditing = editingCommentId === comment.id
+                      const editedAt = (comment as any).edited_at
                       return (
                         <div key={comment.id} className="flex gap-2.5">
                           <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold text-white"
@@ -1588,22 +1626,54 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                             <div className="flex items-baseline gap-2 mb-0.5">
                               <span className="text-xs font-semibold text-gray-900">{authorName || 'Someone'}</span>
                               <span className="text-[10px] text-gray-400"><ClientDate>{new Date(comment.created_at).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</ClientDate></span>
-                              {isOwn && (
-                                <button onClick={() => deleteComment(comment.id)}
-                                  className="ml-auto text-[10px] text-gray-400 hover:text-red-600">delete</button>
+                              {editedAt && (
+                                <span className="text-[10px] text-gray-400 italic">edited</span>
+                              )}
+                              {isOwn && !isEditing && (
+                                <div className="ml-auto flex items-center gap-2">
+                                  <button onClick={() => startEditComment(comment)}
+                                    className="text-[10px] text-gray-400 hover:text-blue-600">edit</button>
+                                  <button onClick={() => deleteComment(comment.id)}
+                                    className="text-[10px] text-gray-400 hover:text-red-600">delete</button>
+                                </div>
                               )}
                             </div>
-                            <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
-                              {comment.body.split(/(@\w+)/g).map((part: string, idx: number) => {
-                                if (part.startsWith('@')) {
-                                  const memberExists = team.some((t: any) => t.name.toLowerCase() === part.substring(1).toLowerCase())
-                                  if (memberExists) {
-                                    return <span key={idx} className="bg-blue-100 text-blue-800 rounded px-1 py-0.5 font-medium">{part}</span>
+                            {isEditing ? (
+                              <div className="space-y-1.5">
+                                <textarea
+                                  value={editingCommentBody}
+                                  onChange={e => setEditingCommentBody(e.target.value)}
+                                  className="w-full text-sm px-2 py-1.5 border border-gray-300 rounded focus:border-blue-500 focus:outline-none resize-y"
+                                  rows={3}
+                                  autoFocus
+                                />
+                                <div className="flex items-center gap-2">
+                                  <button onClick={saveCommentEdit}
+                                    disabled={savingEdit}
+                                    className="text-[11px] px-2 py-1 rounded font-medium text-white disabled:opacity-50"
+                                    style={{ background: 'var(--brand-navy)' }}>
+                                    {savingEdit ? 'Saving…' : 'Save'}
+                                  </button>
+                                  <button onClick={cancelEditComment}
+                                    disabled={savingEdit}
+                                    className="text-[11px] px-2 py-1 rounded text-gray-600 hover:bg-gray-100">
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
+                                {comment.body.split(/(@\w+)/g).map((part: string, idx: number) => {
+                                  if (part.startsWith('@')) {
+                                    const memberExists = team.some((t: any) => t.name.toLowerCase() === part.substring(1).toLowerCase())
+                                    if (memberExists) {
+                                      return <span key={idx} className="bg-blue-100 text-blue-800 rounded px-1 py-0.5 font-medium">{part}</span>
+                                    }
                                   }
-                                }
-                                return <span key={idx}>{part}</span>
-                              })}
-                            </div>
+                                  return <span key={idx}>{part}</span>
+                                })}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )

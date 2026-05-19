@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
 import MentionBadge from './MentionBadge'
+import { useViewMode } from '@/lib/useViewMode'
 
 type NavItem = {
   href: string
@@ -40,7 +41,13 @@ export default function Sidebar({
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const isAdmin = member?.role === 'admin'
-  const items = NAV.filter(n => !n.adminOnly || isAdmin)
+  const [viewMode, setViewMode] = useViewMode(isAdmin)
+  // In team mode, admin-only items are hidden even for admins.
+  const items = NAV.filter(n => {
+    if (!n.adminOnly) return true
+    if (!isAdmin) return false
+    return viewMode === 'admin'
+  })
 
   const viewItems    = items.filter(i => i.section === 'views')
   const filterItems  = items.filter(i => i.section === 'filters')
@@ -103,6 +110,42 @@ export default function Sidebar({
             className="md:hidden text-white/60 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center"
           >×</button>
         </div>
+
+        {/* Admin/Team toggle — visible only to admins */}
+        {isAdmin && (
+          <div className="px-3 pt-3 pb-1">
+            <div
+              className="flex rounded-md p-[3px] gap-[2px]"
+              style={{
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+              }}
+            >
+              <button
+                onClick={() => setViewMode('admin')}
+                className="flex-1 py-1 rounded text-[11px] font-medium transition-colors"
+                style={
+                  viewMode === 'admin'
+                    ? { background: 'var(--brand-accent)', color: 'var(--brand-navy)', fontWeight: 600 }
+                    : { background: 'transparent', color: 'rgba(255,255,255,0.65)' }
+                }
+              >
+                Admin
+              </button>
+              <button
+                onClick={() => setViewMode('team')}
+                className="flex-1 py-1 rounded text-[11px] font-medium transition-colors"
+                style={
+                  viewMode === 'team'
+                    ? { background: 'var(--brand-accent)', color: 'var(--brand-navy)', fontWeight: 600 }
+                    : { background: 'transparent', color: 'rgba(255,255,255,0.65)' }
+                }
+              >
+                Team
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Nav body */}
         <nav className="flex-1 px-2.5 pt-3 pb-3 overflow-y-auto">
