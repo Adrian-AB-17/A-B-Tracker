@@ -1,9 +1,10 @@
 'use client'
 import { useState, useMemo, useEffect } from 'react'
-// removed unused next/navigation imports
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { STAGES, type WorkOrder, type WoStage } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 import { useViewMode } from '@/lib/useViewMode'
+import { ACTIVE_DELIVERY_STAGES, isStale, isOverdue } from '@/lib/sla'
 
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: 'bg-red-50 text-red-700 border-red-200',
@@ -68,6 +69,9 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const isAdmin = currentMember?.role === 'admin'
   const [viewMode] = useViewMode(isAdmin)
   const showCosts = viewMode === 'admin'
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>(initialWorkOrders)
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, [])
@@ -76,6 +80,46 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [filterService, setFilterService] = useState('')
   const [filterOwner, setFilterOwner] = useState('')
   const [selectedWo, setSelectedWo] = useState<WoOrNew | null>(null)
+
+  // ----- URL-driven sidebar filters -----
+  const urlAssignedToMe       = searchParams.get('assignedToMe') === '1'
+  const urlOwnedByMe          = searchParams.get('ownedByMe') === '1'
+  const urlFlagged            = searchParams.get('flagged') === '1'
+  const urlStale              = searchParams.get('stale') === '1'
+  const urlOverdue            = searchParams.get('overdue') === '1'
+  const urlActiveOnly         = searchParams.get('active') === '1'
+  const urlOverdueOrFlagged   = searchParams.get('overdueOrFlagged') === '1'
+  const urlClient             = searchParams.get('client') || ''
+  const urlStage              = searchParams.get('stage') || ''
+
+  const hasUrlFilters = urlAssignedToMe || urlOwnedByMe || urlFlagged || urlStale ||
+    urlOverdue || urlActiveOnly || urlOverdueOrFlagged || !!urlClient || !!urlStage
+
+  // Clear URL filters helper
+  function clearUrlFilters() {
+    router.push(pathname)
+  }
+
+  // Build a human-readable summary of the active URL filter(s)
+  function activeFilterSummary(): string {
+    const parts: string[] = []
+    if (urlAssignedToMe) parts.push('assigned to me')
+    if (urlOwnedByMe) parts.push('owned by me')
+    if (urlFlagged) parts.push('flagged')
+    if (urlStale) parts.push('stale (10d+ in stage)')
+    if (urlOverdue) parts.push('overdue')
+    if (urlActiveOnly) parts.push('active delivery')
+    if (urlOverdueOrFlagged) parts.push('overdue or flagged')
+    if (urlClient) {
+      const c = clients.find((cc: any) => cc.id === urlClient)
+      parts.push(`client: ${c?.name || urlClient}`)
+    }
+    if (urlStage) {
+      if (urlStage === 'approved-or-executed') parts.push('ready to invoice')
+      else parts.push(`stage: ${STAGES.find(s => s.id === urlStage)?.label || urlStage}`)
+    }
+    return parts.join(' · ')
+  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -114,8 +158,10 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       const found = workOrders.find(w => w.id === woId)
       if (found) {
         setSelectedWo(found)
-        // Clear the param without triggering re-render
-        window.history.replaceState({}, '', '/dashboard')
+        // Clear only the wo param, keep other filter params
+        params.delete('wo')
+        const qs = params.toString()
+        window.history.replaceState({}, '', `/dashboard${qs ? '?' + qs : ''}`)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -366,15 +412,60 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     setTogglingAssignee(null)
   }
 
+  const activeDeliverySet = useMemo(() => new Set<string>(ACTIVE_DELIVERY_STAGES), [])
+
   const filtered = useMemo(() => {
     return workOrders.filter(wo => {
+      // Existing in-page filters (search bar + top dropdowns)
       if (search && !wo.title.toLowerCase().includes(search.toLowerCase())) return false
       if (filterClient && wo.client_id !== filterClient) return false
       if (filterService && wo.service_id !== filterService) return false
       if (filterOwner && wo.owner_id !== filterOwner) return false
+
+      // URL-driven sidebar / KPI tile filters (AND logic)
+      if (urlAssignedToMe) {
+        if (!currentMember?.id) return false
+        const woAssignees = assignmentsByWo?.[wo.id] || []
+        if (!woAssignees.includes(currentMember.id)) return false
+      }
+      if (urlOwnedByMe) {
+        if (!currentMember?.id || wo.owner_id !== currentMember.id) return false
+      }
+      if (urlFlagged) {
+        if ((wo as any).flagged !== true) return false
+      }
+      if (urlStale) {
+        if (!isStale(wo)) return false
+      }
+      if (urlOverdue) {
+        if (!isOverdue(wo)) return false
+      }
+      if (urlActiveOnly) {
+        if (!activeDeliverySet.has(wo.stage)) return false
+      }
+      if (urlOverdueOrFlagged) {
+        const flagged = (wo as any).flagged === true
+        const overdue = isOverdue(wo)
+        if (!flagged && !overdue) return false
+      }
+      if (urlClient) {
+        if (wo.client_id !== urlClient) return false
+      }
+      if (urlStage) {
+        if (urlStage === 'approved-or-executed') {
+          if (wo.stage !== 'approved' && wo.stage !== 'deliverables-executed') return false
+        } else {
+          if (wo.stage !== urlStage) return false
+        }
+      }
       return true
     })
-  }, [workOrders, search, filterClient, filterService, filterOwner])
+  }, [
+    workOrders, search, filterClient, filterService, filterOwner,
+    urlAssignedToMe, urlOwnedByMe, urlFlagged, urlStale, urlOverdue,
+    urlActiveOnly, urlOverdueOrFlagged, urlClient, urlStage,
+    currentMember?.id, assignmentsByWo, activeDeliverySet,
+  ])
 
   async function moveStage(woId: string, newStage: WoStage) {
     const prevState = workOrders
@@ -728,6 +819,23 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
 
   return (
     <div className="h-full flex flex-col" style={{ background: 'var(--bg)' }}>
+      {/* Active filter banner */}
+      {hasUrlFilters && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 md:px-6 py-2 flex items-center justify-between gap-3">
+          <div className="text-xs md:text-sm text-amber-900 truncate">
+            <span className="font-semibold">Filter active:</span>{' '}
+            <span className="text-amber-700">{activeFilterSummary()}</span>{' '}
+            <span className="font-mono text-amber-600">· {filtered.length} of {workOrders.length}</span>
+          </div>
+          <button
+            onClick={clearUrlFilters}
+            className="text-xs md:text-sm text-amber-800 hover:text-amber-900 underline font-medium flex-shrink-0"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
       <div className="px-4 md:px-6 py-4 md:py-5 bg-white border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center justify-between mb-3 md:mb-4">
           <div>
@@ -1468,12 +1576,12 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                   {tasks.map(task => {
                     const isDone = task.status === 'done'
                     const today = new Date().toISOString().substring(0, 10)
-                    const isOverdue = !isDone && task.due_date && task.due_date < today
+                    const isOverdueTask = !isDone && task.due_date && task.due_date < today
                     const isDueToday = !isDone && task.due_date && task.due_date === today
                     return (
                       <div key={task.id} className={`rounded-lg border p-3 space-y-2 ${
                         isDone ? 'border-gray-100 bg-gray-50 opacity-70' :
-                        isOverdue ? 'border-red-200 bg-red-50/40' :
+                        isOverdueTask ? 'border-red-200 bg-red-50/40' :
                         isDueToday ? 'border-amber-200 bg-amber-50/40' :
                         'border-gray-200 bg-white'
                       }`}>
@@ -1519,7 +1627,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                               defaultValue={task.due_date || ''}
                               onBlur={e => patchTask(task.id, { due_date: e.target.value || null })}
                               className={`w-full text-xs px-1.5 py-1 border rounded focus:border-blue-500 focus:outline-none bg-white ${
-                                isOverdue ? 'border-red-300 text-red-700' :
+                                isOverdueTask ? 'border-red-300 text-red-700' :
                                 isDueToday ? 'border-amber-300 text-amber-700' :
                                 'border-gray-200'
                               }`} />

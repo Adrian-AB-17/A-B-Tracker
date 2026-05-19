@@ -1,7 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { STAGES } from '@/lib/types'
 import type { WorkOrder } from '@/lib/types'
-import { isStale, isCriticallyStale, isOverdue, daysInStage } from '@/lib/sla'
+import {
+  ACTIVE_DELIVERY_STAGES,
+  isStale,
+  isCriticallyStale,
+  isOverdue,
+  daysInStage,
+} from '@/lib/sla'
 import PipelineClient from './PipelineClient'
 
 export const dynamic = 'force-dynamic'
@@ -77,32 +83,47 @@ export default async function PipelinePage() {
 
   const maxCount = Math.max(...stageDistribution.map(s => s.count), 1)
 
-  // ----- KPI counts -----
-  const activeWos = wos.filter(w => w.stage !== 'paid' && w.stage !== 'archived')
+  // ----- KPI counts (Session 6, May 19 2026 definitions) -----
+  // Active = stages where the team is actively delivering work (tight definition)
+  const activeDeliverySet = new Set<string>(ACTIVE_DELIVERY_STAGES)
+  const activeCount = wos.filter(w => activeDeliverySet.has(w.stage)).length
+
+  // Total counts for the Active subtitle context
   const archivedCount = wos.filter(w => w.stage === 'archived').length
+  const notDoneCount = wos.filter(w => w.stage !== 'paid' && w.stage !== 'archived').length
 
-  const activeCount = activeWos.length
-  const staleWos = activeWos.filter(isStale)
+  // For stale/overdue/flagged, only consider WOs that aren't done
+  const liveWos = wos.filter(w => w.stage !== 'paid' && w.stage !== 'archived')
+
+  // Stale = flat 10 days in any stage (excluding paid/archived)
+  const staleWos = liveWos.filter(isStale)
   const staleCount = staleWos.length
-  const criticallyStaleCount = activeWos.filter(isCriticallyStale).length
+  const criticallyStaleCount = liveWos.filter(isCriticallyStale).length
 
-  const overdueWos = activeWos.filter(isOverdue)
+  // Overdue or Flagged = due_date past OR flagged=true (union)
+  const overdueWos = liveWos.filter(isOverdue)
   const overdueCount = overdueWos.length
-  const flaggedCount = activeWos.filter(w => w.flagged === true).length
-  // "Overdue or Flagged" = union
+  const flaggedCount = liveWos.filter(w => w.flagged === true).length
   const overdueOrFlaggedIds = new Set<string>()
   overdueWos.forEach(w => overdueOrFlaggedIds.add(w.id))
-  activeWos.filter(w => w.flagged === true).forEach(w => overdueOrFlaggedIds.add(w.id))
+  liveWos.filter(w => w.flagged === true).forEach(w => overdueOrFlaggedIds.add(w.id))
   const overdueOrFlaggedCount = overdueOrFlaggedIds.size
 
-  const inApprovalCount = activeWos.filter(w => w.stage === 'sent-for-approval').length
+  // In Approval = stage = sent-for-approval (broad visibility, all)
+  const inApprovalCount = liveWos.filter(w => w.stage === 'sent-for-approval').length
 
-  // ----- Alerts panel: union of critically-stale + overdue + flagged, top 10 by severity -----
-  // Priority: flagged > overdue > critically-stale (dedup by WO id; first match wins)
+  // Admin-only KPIs
+  const readyToInvoiceCount = liveWos.filter(
+    w => w.stage === 'approved' || w.stage === 'deliverables-executed'
+  ).length
+  const invoicedCount = liveWos.filter(w => w.stage === 'invoiced').length
+
+  // ----- Alerts panel: union of flagged + overdue + critically-stale, top 10 -----
+  // Priority order: flagged > overdue > critically-stale (dedup by WO id; first match wins)
   const alertsMap = new Map<string, AlertRow>()
   const stageLabelById = new Map(STAGES.map(s => [s.id, s.label]))
 
-  activeWos.forEach(w => {
+  liveWos.forEach(w => {
     if (alertsMap.has(w.id)) return
     let reason: AlertRow['reason'] | null = null
     if (w.flagged === true) reason = 'flagged'
@@ -120,7 +141,6 @@ export default async function PipelinePage() {
     })
   })
 
-  // Sort: flagged first, then overdue, then critically-stale; within each by days desc
   const reasonRank: Record<AlertRow['reason'], number> = {
     'flagged': 0,
     'overdue': 1,
@@ -141,6 +161,7 @@ export default async function PipelinePage() {
       stageDistribution={stageDistribution}
       maxCount={maxCount}
       activeCount={activeCount}
+      notDoneCount={notDoneCount}
       archivedCount={archivedCount}
       staleCount={staleCount}
       criticallyStaleCount={criticallyStaleCount}
@@ -148,6 +169,8 @@ export default async function PipelinePage() {
       overdueCount={overdueCount}
       flaggedCount={flaggedCount}
       inApprovalCount={inApprovalCount}
+      readyToInvoiceCount={readyToInvoiceCount}
+      invoicedCount={invoicedCount}
       alerts={alerts}
     />
   )
