@@ -1,92 +1,202 @@
 'use client'
 
+import Link from 'next/link'
 import { useViewMode } from '@/lib/useViewMode'
 
-type Stage = { id: string; label: string; color: string }
+type StageDistRow = {
+  id: string
+  label: string
+  color: string
+  count: number
+  value: number
+  oldestDays: number
+}
+
+type AlertRow = {
+  id: string
+  title: string
+  stage: string
+  stageLabel: string
+  days: number
+  ownerName: string | null
+  reason: 'critically-stale' | 'overdue' | 'flagged'
+}
 
 export default function PipelineClient({
-  currentMember, byStage, totalCount, totalValue, activeCount, activeValue,
-  urgentCount, maxCount, stages,
+  currentMember,
+  stageDistribution,
+  maxCount,
+  activeCount,
+  archivedCount,
+  staleCount,
+  criticallyStaleCount,
+  overdueOrFlaggedCount,
+  overdueCount,
+  flaggedCount,
+  inApprovalCount,
+  alerts,
 }: {
   currentMember: { id: string; role: string } | null
-  byStage: Record<string, { count: number; value: number }>
-  totalCount: number
-  totalValue: number
-  activeCount: number
-  activeValue: number
-  urgentCount: number
+  stageDistribution: StageDistRow[]
   maxCount: number
-  stages: Stage[]
+  activeCount: number
+  archivedCount: number
+  staleCount: number
+  criticallyStaleCount: number
+  overdueOrFlaggedCount: number
+  overdueCount: number
+  flaggedCount: number
+  inApprovalCount: number
+  alerts: AlertRow[]
 }) {
   const isAdmin = currentMember?.role === 'admin'
   const [viewMode] = useViewMode(isAdmin)
   const showCosts = viewMode === 'admin'
 
+  const reasonLabel = (r: AlertRow['reason']) => {
+    switch (r) {
+      case 'flagged': return 'Flagged with issue'
+      case 'overdue': return 'Past due date'
+      case 'critically-stale': return 'Critically overdue in stage'
+    }
+  }
+
+  const reasonDot = (r: AlertRow['reason']) => {
+    switch (r) {
+      case 'flagged': return 'bg-red-500'
+      case 'overdue': return 'bg-red-500'
+      case 'critically-stale': return 'bg-amber-500'
+    }
+  }
+
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Pipeline Health</h1>
-        <p className="text-sm text-gray-500 mt-1">Snapshot of every work order in your system</p>
+        <p className="text-sm text-gray-500 mt-1">SLA-driven view of what needs attention</p>
       </div>
 
-      {/* KPI cards — layout shifts from 4 cols (admin) to 2 cols (team) since 2 $ tiles are hidden */}
-      <div className={`grid grid-cols-1 gap-4 mb-6 ${showCosts ? 'sm:grid-cols-4' : 'sm:grid-cols-2'}`}>
+      {/* 4 KPI cards — same layout for admin and team (no $ in any of them) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg border border-gray-200 p-5">
-          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Total WOs</div>
-          <div className="text-3xl font-bold mt-1">{totalCount}</div>
-          <div className="text-xs text-gray-400 mt-1">{activeCount} active</div>
+          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Active Work Orders</div>
+          <div className="text-3xl font-bold mt-1">{activeCount}</div>
+          <div className="text-xs text-gray-400 mt-1">
+            {activeCount + archivedCount} total · {archivedCount} archived
+          </div>
         </div>
-        {showCosts && (
-          <div className="bg-white rounded-lg border border-gray-200 p-5">
-            <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Pipeline Value</div>
-            <div className="text-3xl font-bold mt-1 font-mono">${totalValue.toLocaleString()}</div>
-            <div className="text-xs text-gray-400 mt-1">All work orders</div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-5"
+             style={{ borderColor: staleCount > 0 ? '#f59e0b40' : undefined }}>
+          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Stale (Past SLA)</div>
+          <div className="text-3xl font-bold mt-1" style={{ color: staleCount > 0 ? '#b45309' : undefined }}>
+            {staleCount}
           </div>
-        )}
-        {showCosts && (
-          <div className="bg-white rounded-lg border border-gray-200 p-5"
-               style={{ borderColor: '#d99e2b30' }}>
-            <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Active Value</div>
-            <div className="text-3xl font-bold mt-1 font-mono" style={{ color: '#d99e2b' }}>${activeValue.toLocaleString()}</div>
-            <div className="text-xs text-gray-400 mt-1">Still working</div>
+          <div className="text-xs mt-1" style={{ color: criticallyStaleCount > 0 ? '#dc2626' : '#9ca3af' }}>
+            {criticallyStaleCount > 0 ? `${criticallyStaleCount} critically overdue` : 'All within threshold'}
           </div>
-        )}
-        <div className="bg-white rounded-lg border border-gray-200 p-5">
-          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Urgent</div>
-          <div className="text-3xl font-bold mt-1 text-red-600">{urgentCount}</div>
-          <div className="text-xs text-gray-400 mt-1">Need attention</div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-5"
+             style={{ borderColor: overdueOrFlaggedCount > 0 ? '#dc262640' : undefined }}>
+          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Overdue or Flagged</div>
+          <div className="text-3xl font-bold mt-1" style={{ color: overdueOrFlaggedCount > 0 ? '#dc2626' : undefined }}>
+            {overdueOrFlaggedCount}
+          </div>
+          <div className="text-xs mt-1" style={{ color: overdueOrFlaggedCount > 0 ? '#dc2626' : '#9ca3af' }}>
+            {overdueCount} past due · {flaggedCount} flagged
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-5"
+             style={{ borderColor: inApprovalCount > 0 ? '#7c3aed40' : undefined }}>
+          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">In Approval</div>
+          <div className="text-3xl font-bold mt-1" style={{ color: inApprovalCount > 0 ? '#7c3aed' : undefined }}>
+            {inApprovalCount}
+          </div>
+          <div className="text-xs text-gray-400 mt-1">
+            {inApprovalCount > 0 ? 'Waiting on client review' : 'Nothing in approval'}
+          </div>
         </div>
       </div>
 
-      {/* Stage breakdown — keep all rows, hide $ in team mode */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="font-semibold text-gray-900 mb-5">Distribution by Stage</h2>
-        <div className="space-y-3">
-          {stages.map(s => {
-            const data = byStage[s.id]
-            if (!data || data.count === 0) return null
-            const pct = totalCount ? (data.count / maxCount) * 100 : 0
-            return (
-              <div key={s.id} className="group">
-                <div className="flex items-center justify-between text-sm mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
-                    <span className="font-medium text-gray-700">{s.label}</span>
+      {/* Two-column row: stage distribution (left, wider) + alerts panel (right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-6">
+          <h2 className="font-semibold text-gray-900 mb-5">Distribution by Stage</h2>
+          <div className="space-y-3">
+            {stageDistribution.map(s => {
+              if (s.count === 0) return null
+              const pct = (s.count / maxCount) * 100
+              return (
+                <div key={s.id} className="group">
+                  <div className="flex items-center justify-between text-sm mb-1.5">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                      <span className="font-medium text-gray-700 truncate">{s.label}</span>
+                    </div>
+                    <div className="flex items-center gap-3 font-mono text-xs flex-shrink-0">
+                      <span className="text-gray-500 w-16 text-right">{s.count} WOs</span>
+                      <span
+                        className="w-14 text-right"
+                        style={{ color: s.oldestDays > 30 ? '#dc2626' : '#6b7280' }}
+                        title={`Oldest WO has been in this stage for ${s.oldestDays} days`}
+                      >
+                        {s.oldestDays}d
+                      </span>
+                      {showCosts && (
+                        <span className="font-semibold text-gray-900 w-28 text-right">${s.value.toLocaleString()}</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 font-mono text-xs">
-                    <span className="text-gray-500">{data.count} WOs</span>
-                    {showCosts && (
-                      <span className="font-semibold text-gray-900 w-28 text-right">${data.value.toLocaleString()}</span>
-                    )}
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all"
+                         style={{ width: `${pct}%`, background: s.color }} />
                   </div>
                 </div>
-                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all"
-                       style={{ width: `${pct}%`, background: s.color }} />
-                </div>
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="font-semibold text-gray-900">Alerts</h2>
+            <span className="text-xs text-gray-500 font-mono">{alerts.length}</span>
+          </div>
+          {alerts.length === 0 ? (
+            <div className="text-sm text-gray-500 py-6 text-center">
+              🌿 All clear. No stale, overdue, or flagged work orders.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {alerts.map(a => (
+                <Link
+                  key={a.id}
+                  href={`/dashboard?wo=${a.id}`}
+                  className="block group rounded-md hover:bg-gray-50 -mx-2 px-2 py-2 transition-colors"
+                >
+                  <div className="flex items-start gap-2">
+                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${reasonDot(a.reason)}`} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-gray-900 truncate group-hover:text-amber-700">
+                        {a.title}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {reasonLabel(a.reason)}
+                        {a.reason !== 'flagged' && (
+                          <> in <span className="font-medium">{a.stageLabel}</span></>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5 font-mono">
+                        {a.days}d in stage · {a.ownerName || 'Unassigned'}
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
