@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import MentionBadge from './MentionBadge'
 import { useViewMode } from '@/lib/useViewMode'
 
@@ -25,20 +25,51 @@ const NAV: NavItem[] = [
   { href: '/dashboard/recent',    label: 'Recent Changes',  icon: '🔔', section: 'filters' },
 ]
 
+// Board-applicable toggle filters that operate via URL params
+type BoardFilter = {
+  key: 'assignedToMe' | 'ownedByMe' | 'flagged' | 'stale' | 'overdue'
+  label: string
+  icon: string
+  countKey: keyof SidebarCounts
+}
+
+const BOARD_FILTERS: BoardFilter[] = [
+  { key: 'assignedToMe', label: 'Assigned to me', icon: '👤', countKey: 'assignedToMe' },
+  { key: 'ownedByMe',    label: 'Owned by me',    icon: '★',  countKey: 'ownedByMe' },
+  { key: 'flagged',      label: 'Flagged',        icon: '⚑',  countKey: 'flagged' },
+  { key: 'stale',        label: 'Stale',          icon: '◷',  countKey: 'stale' },
+  { key: 'overdue',      label: 'Overdue',        icon: '!',  countKey: 'overdue' },
+]
+
 export type SidebarCounts = {
   clients?: number
   allWos?: number
   myTasks?: number
+  assignedToMe?: number
+  ownedByMe?: number
+  flagged?: number
+  stale?: number
+  overdue?: number
+}
+
+export type ClientBadge = {
+  id: string
+  name: string
+  count: number
 }
 
 export default function Sidebar({
   member,
   counts = {},
+  clientBadges = [],
 }: {
   member: any
   counts?: SidebarCounts
+  clientBadges?: ClientBadge[]
 }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [mobileOpen, setMobileOpen] = useState(false)
   const isAdmin = member?.role === 'admin'
   const [viewMode, setViewMode] = useViewMode(isAdmin)
@@ -51,6 +82,38 @@ export default function Sidebar({
 
   const viewItems    = items.filter(i => i.section === 'views')
   const filterItems  = items.filter(i => i.section === 'filters')
+
+  const onBoardOrAll = pathname === '/dashboard' || pathname === '/dashboard/all'
+  const activeClient = searchParams.get('client') || ''
+
+  // Toggle a board filter. If active, clears it. If not active, sets it.
+  // Stays on Board/All Work Orders if already there; navigates to Board otherwise.
+  function toggleBoardFilter(key: BoardFilter['key']) {
+    const isCurrentlyActive = searchParams.get(key) === '1'
+    const params = new URLSearchParams(searchParams.toString())
+    if (isCurrentlyActive) {
+      params.delete(key)
+    } else {
+      params.set(key, '1')
+    }
+    const qs = params.toString()
+    const target = onBoardOrAll ? `${pathname}${qs ? '?' + qs : ''}` : `/dashboard${qs ? '?' + qs : ''}`
+    router.push(target)
+    setMobileOpen(false)
+  }
+
+  function toggleClientFilter(clientId: string) {
+    const params = new URLSearchParams(searchParams.toString())
+    if (activeClient === clientId) {
+      params.delete('client')
+    } else {
+      params.set('client', clientId)
+    }
+    const qs = params.toString()
+    const target = onBoardOrAll ? `${pathname}${qs ? '?' + qs : ''}` : `/dashboard${qs ? '?' + qs : ''}`
+    router.push(target)
+    setMobileOpen(false)
+  }
 
   return (
     <>
@@ -165,7 +228,7 @@ export default function Sidebar({
 
           {/* QUICK FILTERS section */}
           <SectionEyebrow>Quick Filters</SectionEyebrow>
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col gap-0.5 mb-1">
             {filterItems.map(item => (
               <NavRow
                 key={item.href}
@@ -175,7 +238,44 @@ export default function Sidebar({
                 count={item.countKey ? counts[item.countKey] : undefined}
               />
             ))}
+            {BOARD_FILTERS.map(f => {
+              const active = searchParams.get(f.key) === '1'
+              const count = counts[f.countKey]
+              const isRed = f.key === 'flagged' || f.key === 'overdue'
+              const isAmber = f.key === 'stale'
+              return (
+                <FilterToggleRow
+                  key={f.key}
+                  icon={f.icon}
+                  label={f.label}
+                  active={active}
+                  count={count}
+                  iconColor={isRed ? '#fca5a5' : isAmber ? '#fbbf24' : undefined}
+                  onClick={() => toggleBoardFilter(f.key)}
+                />
+              )
+            })}
           </div>
+
+          {/* CLIENTS section */}
+          {clientBadges.length > 0 && (
+            <>
+              <SectionEyebrow>Clients</SectionEyebrow>
+              <div className="flex flex-col gap-0.5 mb-2">
+                {clientBadges.map(c => (
+                  <FilterToggleRow
+                    key={c.id}
+                    icon="●"
+                    label={c.name}
+                    active={activeClient === c.id}
+                    count={c.count}
+                    iconColor="rgba(255,255,255,0.4)"
+                    onClick={() => toggleClientFilter(c.id)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </nav>
 
         {/* User footer */}
@@ -279,5 +379,65 @@ function NavRow({
       )}
       {item.href === '/dashboard/mentions' && <MentionBadge />}
     </a>
+  )
+}
+
+function FilterToggleRow({
+  icon,
+  label,
+  active,
+  count,
+  iconColor,
+  onClick,
+}: {
+  icon: string
+  label: string
+  active: boolean
+  count?: number
+  iconColor?: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-medium transition-colors w-full text-left"
+      style={
+        active
+          ? {
+              background: 'rgba(217, 158, 43, 0.15)',
+              color: 'white',
+              boxShadow: 'inset 2px 0 0 var(--brand-accent)',
+            }
+          : { color: 'rgba(255,255,255,0.85)' }
+      }
+      onMouseEnter={e => {
+        if (!active) {
+          e.currentTarget.style.background = 'rgba(255,255,255,0.06)'
+          e.currentTarget.style.color = 'white'
+        }
+      }}
+      onMouseLeave={e => {
+        if (!active) {
+          e.currentTarget.style.background = 'transparent'
+          e.currentTarget.style.color = 'rgba(255,255,255,0.85)'
+        }
+      }}
+    >
+      <span
+        className="text-[14px] w-4 text-center flex-shrink-0"
+        style={iconColor ? { color: iconColor } : undefined}
+      >
+        {icon}
+      </span>
+      <span className="flex-1 truncate">{label}</span>
+      {typeof count === 'number' && count > 0 && (
+        <span
+          className="font-mono text-[11px] tabular-nums"
+          style={{ color: active ? 'var(--brand-accent)' : 'rgba(255,255,255,0.4)' }}
+        >
+          {count}
+        </span>
+      )}
+    </button>
   )
 }

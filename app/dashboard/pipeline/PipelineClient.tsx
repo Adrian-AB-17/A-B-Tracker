@@ -76,125 +76,116 @@ export default function PipelineClient({
     }
   }
 
+  // Card wrapper as a Link — gives consistent hover + cursor + transition.
+  function KpiCard({
+    href,
+    label,
+    value,
+    valueColor,
+    subtitle,
+    subtitleColor,
+    borderColor,
+  }: {
+    href: string
+    label: string
+    value: number
+    valueColor?: string
+    subtitle: string
+    subtitleColor?: string
+    borderColor?: string
+  }) {
+    return (
+      <Link
+        href={href}
+        className="bg-white rounded-lg border border-gray-200 p-5 transition-all hover:shadow-md hover:border-gray-300 cursor-pointer block"
+        style={borderColor ? { borderColor } : undefined}
+      >
+        <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">{label}</div>
+        <div className="text-3xl font-bold mt-1" style={valueColor ? { color: valueColor } : undefined}>
+          {value}
+        </div>
+        <div className="text-xs mt-1" style={{ color: subtitleColor || '#9ca3af' }}>
+          {subtitle}
+        </div>
+      </Link>
+    )
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Pipeline Health</h1>
-        <p className="text-sm text-gray-500 mt-1">SLA-driven view of what needs attention</p>
+        <p className="text-sm text-gray-500 mt-1">SLA-driven view of what needs attention · Click any tile to filter the board</p>
       </div>
 
       {/* KPI cards: 4 for team, 6 for admin (2 extra: Ready to Invoice + Invoiced) */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${showCosts ? 'lg:grid-cols-3 xl:grid-cols-6' : 'lg:grid-cols-4'} gap-4 mb-6`}>
         {/* Card 1: Active */}
-        <div className="bg-white rounded-lg border border-gray-200 p-5">
-          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Active</div>
-          <div className="text-3xl font-bold mt-1">{activeCount}</div>
-          <div className="text-xs text-gray-400 mt-1">
-            of {notDoneCount} open · {archivedCount} archived
-          </div>
-        </div>
+        <KpiCard
+          href="/dashboard?active=1"
+          label="Active"
+          value={activeCount}
+          subtitle={`of ${notDoneCount} open · ${archivedCount} archived`}
+        />
 
         {/* Card 2: Stale */}
-        <div
-          className="bg-white rounded-lg border border-gray-200 p-5"
-          style={{ borderColor: staleCount > 0 ? '#f59e0b40' : undefined }}
-        >
-          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">
-            Stale ({STALE_DAYS}d+)
-          </div>
-          <div
-            className="text-3xl font-bold mt-1"
-            style={{ color: staleCount > 0 ? '#b45309' : undefined }}
-          >
-            {staleCount}
-          </div>
-          <div
-            className="text-xs mt-1"
-            style={{ color: criticallyStaleCount > 0 ? '#dc2626' : '#9ca3af' }}
-          >
-            {criticallyStaleCount > 0
+        <KpiCard
+          href="/dashboard?stale=1"
+          label={`Stale (${STALE_DAYS}d+)`}
+          value={staleCount}
+          valueColor={staleCount > 0 ? '#b45309' : undefined}
+          subtitle={
+            criticallyStaleCount > 0
               ? `${criticallyStaleCount} critically overdue`
-              : 'All within threshold'}
-          </div>
-        </div>
+              : 'All within threshold'
+          }
+          subtitleColor={criticallyStaleCount > 0 ? '#dc2626' : undefined}
+          borderColor={staleCount > 0 ? '#f59e0b40' : undefined}
+        />
 
         {/* Card 3: Overdue or Flagged */}
-        <div
-          className="bg-white rounded-lg border border-gray-200 p-5"
-          style={{ borderColor: overdueOrFlaggedCount > 0 ? '#dc262640' : undefined }}
-        >
-          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">
-            Overdue or Flagged
-          </div>
-          <div
-            className="text-3xl font-bold mt-1"
-            style={{ color: overdueOrFlaggedCount > 0 ? '#dc2626' : undefined }}
-          >
-            {overdueOrFlaggedCount}
-          </div>
-          <div
-            className="text-xs mt-1"
-            style={{ color: overdueOrFlaggedCount > 0 ? '#dc2626' : '#9ca3af' }}
-          >
-            {overdueCount} past due · {flaggedCount} flagged
-          </div>
-        </div>
+        <KpiCard
+          href="/dashboard?overdueOrFlagged=1"
+          label="Overdue or Flagged"
+          value={overdueOrFlaggedCount}
+          valueColor={overdueOrFlaggedCount > 0 ? '#dc2626' : undefined}
+          subtitle={`${overdueCount} past due · ${flaggedCount} flagged`}
+          subtitleColor={overdueOrFlaggedCount > 0 ? '#dc2626' : undefined}
+          borderColor={overdueOrFlaggedCount > 0 ? '#dc262640' : undefined}
+        />
 
         {/* Card 4: In Approval */}
-        <div
-          className="bg-white rounded-lg border border-gray-200 p-5"
-          style={{ borderColor: inApprovalCount > 0 ? '#7c3aed40' : undefined }}
-        >
-          <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">In Approval</div>
-          <div
-            className="text-3xl font-bold mt-1"
-            style={{ color: inApprovalCount > 0 ? '#7c3aed' : undefined }}
-          >
-            {inApprovalCount}
-          </div>
-          <div className="text-xs text-gray-400 mt-1">
-            {inApprovalCount > 0 ? 'Waiting on client review' : 'Nothing in approval'}
-          </div>
-        </div>
+        <KpiCard
+          href="/dashboard?stage=sent-for-approval"
+          label="In Approval"
+          value={inApprovalCount}
+          valueColor={inApprovalCount > 0 ? '#7c3aed' : undefined}
+          subtitle={inApprovalCount > 0 ? 'Waiting on client review' : 'Nothing in approval'}
+          borderColor={inApprovalCount > 0 ? '#7c3aed40' : undefined}
+        />
 
         {/* Admin-only Card 5: Ready to Invoice */}
         {showCosts && (
-          <div
-            className="bg-white rounded-lg border border-gray-200 p-5"
-            style={{ borderColor: readyToInvoiceCount > 0 ? '#10b98140' : undefined }}
-          >
-            <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">
-              Ready to Invoice
-            </div>
-            <div
-              className="text-3xl font-bold mt-1"
-              style={{ color: readyToInvoiceCount > 0 ? '#059669' : undefined }}
-            >
-              {readyToInvoiceCount}
-            </div>
-            <div className="text-xs text-gray-400 mt-1">
-              {readyToInvoiceCount > 0 ? 'Approved + executed' : 'Nothing to invoice'}
-            </div>
-          </div>
+          <KpiCard
+            href="/dashboard?stage=approved-or-executed"
+            label="Ready to Invoice"
+            value={readyToInvoiceCount}
+            valueColor={readyToInvoiceCount > 0 ? '#059669' : undefined}
+            subtitle={readyToInvoiceCount > 0 ? 'Approved + executed' : 'Nothing to invoice'}
+            borderColor={readyToInvoiceCount > 0 ? '#10b98140' : undefined}
+          />
         )}
 
         {/* Admin-only Card 6: Invoiced */}
         {showCosts && (
-          <div
-            className="bg-white rounded-lg border border-gray-200 p-5"
-            style={{ borderColor: invoicedCount > 0 ? '#d99e2b40' : undefined }}
-          >
-            <div className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Invoiced</div>
-            <div
-              className="text-3xl font-bold mt-1"
-              style={{ color: invoicedCount > 0 ? '#d99e2b' : undefined }}
-            >
-              {invoicedCount}
-            </div>
-            <div className="text-xs text-gray-400 mt-1">
-              {invoicedCount > 0 ? 'Awaiting payment' : 'No outstanding invoices'}
-            </div>
-          </div>
+          <KpiCard
+            href="/dashboard?stage=invoiced"
+            label="Invoiced"
+            value={invoicedCount}
+            valueColor={invoicedCount > 0 ? '#d99e2b' : undefined}
+            subtitle={invoicedCount > 0 ? 'Awaiting payment' : 'No outstanding invoices'}
+            borderColor={invoicedCount > 0 ? '#d99e2b40' : undefined}
+          />
         )}
       </div>
 
@@ -207,11 +198,15 @@ export default function PipelineClient({
               if (s.count === 0) return null
               const pct = (s.count / maxCount) * 100
               return (
-                <div key={s.id} className="group">
+                <Link
+                  key={s.id}
+                  href={`/dashboard?stage=${s.id}`}
+                  className="block group rounded-md hover:bg-gray-50 -mx-2 px-2 py-1.5 transition-colors"
+                >
                   <div className="flex items-center justify-between text-sm mb-1.5">
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                      <span className="font-medium text-gray-700 truncate">{s.label}</span>
+                      <span className="font-medium text-gray-700 truncate group-hover:text-gray-900">{s.label}</span>
                     </div>
                     <div className="flex items-center gap-3 font-mono text-xs flex-shrink-0">
                       <span className="text-gray-500 w-16 text-right">{s.count} WOs</span>
@@ -235,7 +230,7 @@ export default function PipelineClient({
                       style={{ width: `${pct}%`, background: s.color }}
                     />
                   </div>
-                </div>
+                </Link>
               )
             })}
           </div>
