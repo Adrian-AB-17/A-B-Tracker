@@ -61,3 +61,20 @@ export interface WoLineItem {
   created_at: string
   created_by?: string | null
 }
+
+/**
+ * Per-client price override for a given service. When present for a
+ * (client_id, service_id) pair, replaces the service's base_price for
+ * pricing new work orders. Historical work orders keep their snapshot price.
+ *
+ * Note column is `notes` (plural) to match the existing DB schema.
+ */
+export interface ClientRate {
+  id: string
+  client_id: string
+  service_id: string
+  price: number
+  notes?: string | null
+  effective_from?: string  // date
+  created_at: string
+}
