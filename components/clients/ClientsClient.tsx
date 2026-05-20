@@ -190,13 +190,14 @@ export default function ClientsClient({
   }, [selected, selectedWOs, clientRates, services])
 
   // Projected monthly revenue: sum of effective rate for each unique RECURRING
-  // service the client has ever had a WO for. Answers "if we keep them at
-  // current rates, what's their monthly run-rate?" Recurring relationships
-  // persist regardless of an individual WO's current stage — a paid March SEO
-  // WO doesn't mean the client stopped paying for SEO.
+  // service that's on this client's rate card. "On the rate card" means EITHER
+  // (a) the client has at least one WO for it, OR (b) the client has a custom
+  // rate override for it. This matches the rate card definition exactly, so
+  // the tile total equals the sum of the recurring rows you see below.
   const projectedMonthly = useMemo(() => {
     if (!selected) return 0
     const recurringServiceIds = new Set<string>()
+    // (a) Services this client has WOs for
     selectedWOs.forEach(wo => {
       if (!wo.service_id) return
       const svc = services.find(s => s.id === wo.service_id)
@@ -204,6 +205,15 @@ export default function ClientsClient({
       if (svc.occurrence !== 'Recurring') return
       recurringServiceIds.add(wo.service_id)
     })
+    // (b) Services with an override for this client (even if no WO yet)
+    clientRates
+      .filter(r => r.client_id === selected.id)
+      .forEach(r => {
+        const svc = services.find(s => s.id === r.service_id)
+        if (!svc) return
+        if (svc.occurrence !== 'Recurring') return
+        recurringServiceIds.add(r.service_id)
+      })
     let total = 0
     recurringServiceIds.forEach(sid => {
       const resolved = priceFor(selected.id, sid, services as any, clientRates)
