@@ -8,3 +8,4 @@ node_modules/
 
 # One-off development helper scripts (not for production)
 *.sh
+docs/
