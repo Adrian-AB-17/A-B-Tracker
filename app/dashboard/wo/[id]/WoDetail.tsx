@@ -13,6 +13,7 @@ import {
 } from '@/lib/campaign-items'
 import CampaignBuilderSection from '@/components/work-orders/CampaignBuilderSection'
 import WoTasksTab from './WoTasksTab'
+import WoMessagesTab from './WoMessagesTab'
 
 type Tab =
   | 'overview'
@@ -231,9 +232,12 @@ export default function WoDetail({
           />
         )}
         {tab === 'messages' && (
-          <Placeholder
-            title="Messages"
-            note="Comments + @mentions get a proper home here. Coming in Step 5."
+          <WoMessagesTab
+            wo={wo}
+            initialComments={initialComments}
+            team={team}
+            authUserMap={authUserMap}
+            currentUserId={currentUserId}
           />
         )}
         {tab === 'files' && (
