@@ -12,6 +12,7 @@ import {
   type CampaignPick,
 } from '@/lib/campaign-items'
 import CampaignBuilderSection from '@/components/work-orders/CampaignBuilderSection'
+import WoTasksTab from './WoTasksTab'
 
 type Tab =
   | 'overview'
@@ -223,9 +224,10 @@ export default function WoDetail({
               />
         )}
         {tab === 'tasks' && (
-          <Placeholder
-            title="Tasks"
-            note="Lifting the tasks UI out of the drawer into this tab. Coming in Step 5."
+          <WoTasksTab
+            wo={wo}
+            initialTasks={initialTasks}
+            team={team}
           />
         )}
         {tab === 'messages' && (
