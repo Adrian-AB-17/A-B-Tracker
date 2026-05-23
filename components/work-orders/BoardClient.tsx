@@ -9,6 +9,7 @@ import { priceFor } from '@/lib/pricing'
 import { isCampaignService, CAMPAIGN_ITEMS, campaignItemCost, type CampaignPick } from '@/lib/campaign-items'
 import WoLineItemsSection from './WoLineItemsSection'
 import CampaignBuilderSection from './CampaignBuilderSection'
+import DrawerScheduleSection, { ScheduleRow } from './DrawerScheduleSection'
 
 const PRIORITY_COLORS: Record<string, string> = {
   urgent: 'bg-red-50 text-red-700 border-red-200',
@@ -357,6 +358,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [newWo, setNewWo] = useState<Partial<WorkOrder>>({})
   // Campaign builder state — only used when service is Storm Response or Marketing Campaign
   const [campaignPicks, setCampaignPicks] = useState<CampaignPick[]>([])
+  const [newWoSchedule, setNewWoSchedule] = useState<ScheduleRow[]>([])
   const [campaignTitle, setCampaignTitle] = useState('')
   const [campaignDuration, setCampaignDuration] = useState<{ value: string; unit: 'days' | 'weeks' | 'months' }>({ value: '', unit: 'weeks' })
   function openNewWo() {
@@ -436,6 +438,24 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       }
     }
 
+    // Flush buffered schedule rows (from drawer Execution Schedule on new WO)
+    if (newWoSchedule.length > 0) {
+      const scheduleRows = newWoSchedule.map(s => ({
+        work_order_id: woRow.id,
+        scheduled_date: s.scheduled_date,
+        scheduled_time: s.scheduled_time,
+        type: s.type,
+        title: s.title,
+        owner_id: s.owner_id,
+        status: s.status,
+        sort_order: s.sort_order,
+      }))
+      const { error: schedError } = await supabase.from('wo_schedule').insert(scheduleRows)
+      if (schedError) {
+        alert(`WO created, but schedule rows failed to save: ${schedError.message}`)
+      }
+    }
+
     setSaving(false)
     setWorkOrders(prev => [woRow, ...prev])
     setSelectedWo(null)
@@ -444,6 +464,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     setCampaignPicks([])
     setCampaignTitle('')
     setCampaignDuration({ value: '', unit: 'weeks' })
+    setNewWoSchedule([])
   }
 
   const dueAlerts = useMemo(() => {
@@ -1560,6 +1581,16 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                       className="w-full text-sm text-gray-700 px-3 py-2 border border-gray-200 rounded resize-none focus:border-blue-500 focus:outline-none" />
                   )}
                 </div>
+              </div>
+
+              {/* ─── Execution Schedule section (Surface 2) ─── */}
+              <div className="pt-2">
+                <DrawerScheduleSection
+                  workOrderId={isNew ? null : (wo?.id ?? null)}
+                  team={team || []}
+                  bufferedRows={isNew ? newWoSchedule : undefined}
+                  onBufferedChange={isNew ? setNewWoSchedule : undefined}
+                />
               </div>
 
               {/* ─── Tasks summary card (Step 4) ─── */}
