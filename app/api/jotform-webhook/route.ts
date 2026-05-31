@@ -170,7 +170,7 @@ async function handleMarketingWO(
   const get = (label: string): string => {
     const target = label.toLowerCase().trim().replace(/\s+/g, '')
     for (const [k, v] of Object.entries(raw)) {
-      const norm = String(k).toLowerCase().trim().replace(/[_\s]+/g, '')
+      const norm = String(k).toLowerCase().trim().replace(/^q\d+_/, '').replace(/\d+$/, '').replace(/[_\s]+/g, '')
       // Match if the key ends with the target (handles q3_email, q4_typeOfProject, etc.)
       if (norm === target || norm.endsWith(target)) {
         if (typeof v === 'string') return v
@@ -293,46 +293,86 @@ async function handlePerformancePlus(
     if (existing?.id) return { woId: existing.id }
   }
 
+  // Strip Jotform's q{N}_ prefix and trailing digit suffix so we can match
+  // duplicate field keys consistently. Examples:
+  //   q199_branch199    → branch
+  //   q5_email          → email
+  //   q3_myProducts3    → myproducts
+  const normKey = (k: string): string =>
+    String(k)
+      .toLowerCase()
+      .replace(/^q\d+_/, '')
+      .replace(/\d+$/, '')
+      .trim()
+
   const get = (label: string): string => {
     const target = label.toLowerCase().trim().replace(/\s+/g, '')
     for (const [k, v] of Object.entries(raw)) {
-      const norm = String(k).toLowerCase().trim().replace(/[_\s]+/g, '')
-      if (norm === target || norm.endsWith(target)) {
-        if (typeof v === 'string') return v
-        if (v && typeof v === 'object') return JSON.stringify(v)
-        return ''
+      if (normKey(k) === target) {
+        if (typeof v === 'string') {
+          if (v.trim()) return v
+        } else if (v && typeof v === 'object') {
+          return JSON.stringify(v)
+        }
       }
     }
     return ''
   }
 
-  // Extract product selections.
-  // Jotform "my products" field arrives as either a stringified array, a
-  // comma-separated list of "Product Name (amount=$X)" entries, or an object
-  // with paid product structure. We handle the common shapes defensively.
-  const productsRaw = get('myProducts') || get('products')
-  const recipientName = get('recipientName') || get('recipient')
+  // Recipient name is {first, last} in real Jotform payloads
+  const parseRecipientName = (): string => {
+    for (const [k, v] of Object.entries(raw)) {
+      const norm = String(k).toLowerCase().replace(/[_\s]+/g, '')
+      if (norm.includes('recipientname')) {
+        if (typeof v === 'string' && v.trim()) return v.trim()
+        if (v && typeof v === 'object') {
+          const first = String((v as any).first || '').trim()
+          const last = String((v as any).last || '').trim()
+          const combined = `${first} ${last}`.trim()
+          if (combined) return combined
+        }
+      }
+    }
+    return ''
+  }
+
+  // Products field q3_myProducts3 is a structured object: { products: [...] }
+  // Extract array directly instead of trying to parse a comma-separated string.
+  const findProductsArray = (): Array<any> => {
+    for (const [k, v] of Object.entries(raw)) {
+      const norm = String(k).toLowerCase().replace(/[_\s]+/g, '')
+      if (norm.includes('myproducts') && v && typeof v === 'object') {
+        const products = (v as any).products
+        if (Array.isArray(products)) return products
+      }
+    }
+    return []
+  }
+
+  const recipientName = parseRecipientName()
   const recipientEmail = get('email') || get('eMail')
   const branch = get('branch')
   const billingAddress = get('address')
+  const products = findProductsArray()
 
-  // --- Build title ---
   const branchStr = branch ? branch.trim() : 'Unknown Branch'
-  const recipStr = recipientName ? recipientName.trim() : 'Unknown Recipient'
+  const recipStr = recipientName || 'Unknown Recipient'
   const title = `${branchStr} - RBS Performance Plus Order - ${recipStr}`
 
-  // --- Generate WO id ---
   const woId = 'WO-' + crypto.randomUUID().slice(0, 8)
 
-  // --- Build notes ---
   const notesParts: string[] = []
   if (recipientEmail) notesParts.push(`Recipient email: ${recipientEmail}`)
   if (billingAddress) notesParts.push(`Billing address: ${billingAddress}`)
-  if (productsRaw) notesParts.push(`Products (raw): ${productsRaw}`)
+  if (products.length > 0) {
+    const summary = products
+      .map((p) => `${p.productName} x${p.quantity} = $${p.subTotal}`)
+      .join(', ')
+    notesParts.push(`Products: ${summary}`)
+  }
   notesParts.push(`(Imported from Jotform RBS Performance Plus submission ${submissionID})`)
   const combinedNotes = notesParts.join('\n\n')
 
-  // --- Insert WO ---
   const { error: woError } = await supabase.from('work_orders').insert({
     id: woId,
     client_id: 'rbs',
@@ -355,54 +395,19 @@ async function handlePerformancePlus(
     throw new Error(`work_orders insert failed: ${woError.message}`)
   }
 
-  // --- Parse products into line items ---
-  // The Performance Plus form has fixed pricing the admin knows:
-  //   "50 Brochures RBS PLUS" → $222.30
-  //   "100 Brochures RBS PLUS" → $326.30
-  //   "Shipping" → $30.00 (always selected, required)
-  //
-  // Jotform sends the product field as a comma-separated string when
-  // multiple are selected, e.g. "50 Brochures RBS PLUS, Shipping".
-  // We parse by name and assign known prices.
-  const PRICE_MAP: Record<string, number> = {
-    '50 brochures rbs plus': 222.30,
-    '100 brochures rbs plus': 326.30,
-    'shipping': 30.00,
-  }
-
-  const lineItems: any[] = []
-  if (productsRaw) {
-    // Split on common Jotform delimiters
-    const cleaned = productsRaw.replace(/[\[\]"]/g, '')
-    const items = cleaned.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean)
-    let sortOrder = 1
-    for (const item of items) {
-      const normalized = item.toLowerCase().replace(/\s+/g, ' ').trim()
-      // Try to find matching price by checking if product name is contained
-      let price = 0
-      let matchedName = item
-      for (const [knownName, knownPrice] of Object.entries(PRICE_MAP)) {
-        if (normalized.includes(knownName)) {
-          price = knownPrice
-          matchedName = knownName.replace(/\b\w/g, c => c.toUpperCase()) // Title Case
-          break
-        }
-      }
-      lineItems.push({
-        work_order_id: woId,
-        description: matchedName,
-        qty: 1,
-        unit_price: price,
-        sort_order: sortOrder++,
-        source: 'jotform',
-      })
-    }
-  }
+  // Line items from the structured products array.
+  const lineItems = products.map((p, idx) => ({
+    work_order_id: woId,
+    description: String(p.productName || `Item ${idx + 1}`),
+    qty: Number(p.quantity) || 1,
+    unit_price: Number(p.unitPrice) || 0,
+    sort_order: idx + 1,
+    source: 'jotform',
+  }))
 
   if (lineItems.length > 0) {
     const { error: liError } = await supabase.from('wo_line_items').insert(lineItems)
     if (liError) {
-      // WO already created, log but don't roll back
       console.error('[jotform-webhook] line items insert failed:', liError.message)
     }
   }
@@ -419,7 +424,6 @@ async function handleEventFlyer(
   raw: Record<string, any>,
   submissionID: string
 ): Promise<{ woId: string }> {
-  // Idempotency
   if (submissionID) {
     const { data: existing } = await supabase
       .from('work_orders')
@@ -429,52 +433,66 @@ async function handleEventFlyer(
     if (existing?.id) return { woId: existing.id }
   }
 
+  // Strip Jotform's q{N}_ prefix and trailing digit suffix so we can match
+  // duplicate field keys consistently. Examples:
+  //   q199_branch199    → branch
+  //   q5_email          → email
+  //   q3_myProducts3    → myproducts
+  const normKey = (k: string): string =>
+    String(k)
+      .toLowerCase()
+      .replace(/^q\d+_/, '')
+      .replace(/\d+$/, '')
+      .trim()
+
   const get = (label: string): string => {
     const target = label.toLowerCase().trim().replace(/\s+/g, '')
     for (const [k, v] of Object.entries(raw)) {
-      const norm = String(k).toLowerCase().trim().replace(/[_\s]+/g, '')
-      if (norm === target || norm.endsWith(target)) {
-        if (typeof v === 'string') return v
-        if (v && typeof v === 'object') return JSON.stringify(v)
-        return ''
+      if (normKey(k) === target) {
+        if (typeof v === 'string') {
+          if (v.trim()) return v
+        } else if (v && typeof v === 'object') {
+          return JSON.stringify(v)
+        }
       }
     }
     return ''
   }
 
-  // Extract fields. Form 3 has many fields per path; we grab everything
-  // we can find and dump unmapped data into notes.
-  const flyerType = get('selectTheFlyer') || get('flyerType') || get('selectYourOrder') || get('pleaseSelect')
+  // Clean overly-verbose flyer type names: take everything before first '(' or ':'.
+  const cleanFlyerType = (s: string): string => {
+    if (!s) return ''
+    return s.replace(/\s*[(:].*$/, '').trim()
+  }
+
+  const rawFlyerType =
+    get('pleaseSelect') ||
+    get('selectTheFlyer') ||
+    get('flyerType') ||
+    get('selectYourOrder')
+  const flyerType = cleanFlyerType(rawFlyerType)
   const branch = get('branch')
   const vendorBrand = get('vendorBrand') || get('vendor')
-  const submitterEmail = get('branchManagerEmail') || get('email')
-  const eventDate = get('eventDate') || get('startingDate') || get('starting')
-  const endDate = get('endingDate') || get('ending')
+  const submitterEmail = get('branchManager') || get('email')
+  const eventDate = get('eventDate') || get('startingDate')
+  const endDate = get('endingDate')
   const eventType = get('eventType')
-  const callToAction = get('callToAction')
-  const startTime = get('eventStartTime') || get('startTime')
-  const endTime = get('eventEndTime') || get('endTime')
-  const lunch = get('areYouProvidingLunch') || get('lunch')
+  const callToAction = get('callTo')
+  const startTime = get('eventStart')
+  const endTime = get('eventEnd')
   const location = get('location')
-  const locationAddress = get('provideLocationAddress') || get('locationAddress')
-  const locationName = get('nameOfTheLocation') || get('locationName')
-  const content = get('content')
-  const additionalInstructions = get('additionalAndFurther') || get('additional')
-  const printing = get('printing')
-  const wantPrintedMailed = get('doYouWantYour') || get('wantPrinted')
-  const howMany = get('howMany') || get('quantity')
-  const guidelines = get('guidelinesForThe') || get('guidelines')
-  const updateGmb = get('doYouWantUsToUpdate') || get('googleMyBusiness') || get('gmb')
-  const targetedAdvertising = get('areYouInterestedIn') || get('targetedAdvertising')
-  const dueDate = get('deliverablesDueDate') || get('dueDate')
+  const locationAddress = get('provideLocation')
+  const locationName = get('nameOf')
+  const additionalInstructions = get('additionalAnd')
+  const howMany = get('howMany')
+  const guidelines = get('guidelinesFor')
+  const dueDate = get('deliverableDue')
 
-  // --- Title ---
   const branchStr = branch ? branch.trim() : 'Unknown Branch'
-  const flyerStr = flyerType ? flyerType.trim() : 'Event/Flyer'
+  const flyerStr = flyerType || 'Event/Flyer'
   const vendorStr = vendorBrand ? vendorBrand.trim() : 'Unspecified'
   const title = `${branchStr} - RBS ${flyerStr} - ${vendorStr}`
 
-  // --- Parse dates ---
   const parseJotformDate = (s: string): string | null => {
     if (!s) return null
     try {
@@ -491,31 +509,22 @@ async function handleEventFlyer(
     return null
   }
 
-  // --- Build notes (all the path-specific fields) ---
   const notesParts: string[] = []
-  if (flyerType) notesParts.push(`Flyer type: ${flyerType}`)
+  if (rawFlyerType) notesParts.push(`Order type: ${rawFlyerType}`)
   if (eventType) notesParts.push(`Event type: ${eventType}`)
   if (callToAction) notesParts.push(`Call to action: ${callToAction}`)
   if (startTime || endTime) notesParts.push(`Event time: ${startTime || '?'} - ${endTime || '?'}`)
-  if (lunch) notesParts.push(`Lunch provided: ${lunch}`)
   if (location) notesParts.push(`Location: ${location}`)
   if (locationName) notesParts.push(`Location name: ${locationName}`)
   if (locationAddress) notesParts.push(`Location address: ${locationAddress}`)
-  if (content) notesParts.push(`Content: ${content}`)
   if (guidelines) notesParts.push(`Guidelines: ${guidelines}`)
   if (additionalInstructions) notesParts.push(`Additional instructions: ${additionalInstructions}`)
-  if (printing) notesParts.push(`Printing: ${printing}`)
-  if (wantPrintedMailed) notesParts.push(`Printed/mailed: ${wantPrintedMailed}`)
   if (howMany) notesParts.push(`How many: ${howMany}`)
-  if (updateGmb) notesParts.push(`Update Google My Business: ${updateGmb}`)
-  if (targetedAdvertising) notesParts.push(`Targeted advertising: ${targetedAdvertising}`)
   notesParts.push(`(Imported from Jotform RBS Event/Flyer submission ${submissionID})`)
   const combinedNotes = notesParts.join('\n\n')
 
-  // --- Generate WO id ---
   const woId = 'WO-' + crypto.randomUUID().slice(0, 8)
 
-  // --- Insert WO ---
   const { error } = await supabase.from('work_orders').insert({
     id: woId,
     client_id: 'rbs',
@@ -542,4 +551,3 @@ async function handleEventFlyer(
 
   return { woId }
 }
-
