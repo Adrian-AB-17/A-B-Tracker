@@ -21,8 +21,22 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const response = NextResponse.redirect(new URL('/dashboard', request.url), {
-    status: 303,
+  // Is this a portal (client) user? Route them to /portal instead of /dashboard.
+  const { data: portalRow } = await supabase
+    .from('portal_users')
+    .select('active')
+    .eq('auth_user_id', data.session.user.id)
+    .maybeSingle()
+  const isPortalUser = !!portalRow && portalRow.active !== false
+
+  const response = NextResponse.redirect(
+    new URL(isPortalUser ? '/portal' : '/dashboard', request.url),
+    { status: 303 }
+  )
+
+  // Cache the role flag so middleware avoids a DB lookup on every request.
+  response.cookies.set('ab-portal', isPortalUser ? '1' : '0', {
+    path: '/', sameSite: 'lax', maxAge: 60 * 60 * 24 * 7,
   })
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
