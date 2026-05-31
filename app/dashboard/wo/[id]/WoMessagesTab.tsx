@@ -73,6 +73,11 @@ export default function WoMessagesTab({
     return mentionCandidates.filter(t => t.name.toLowerCase().includes(q)).slice(0, 6)
   }, [mentionCandidates, mentionDropdown.query])
 
+  const currentUserName = useMemo(() => {
+    const me = team.find(t => t.auth_user_id === currentUserId)
+    return me?.name || 'Someone'
+  }, [team, currentUserId])
+
   function insertMention(memberName: string) {
     const cursorPos = mentionDropdown.position + 1 + mentionDropdown.query.length
     const before = newComment.substring(0, mentionDropdown.position)
@@ -118,6 +123,23 @@ export default function WoMessagesTab({
     setNewComment('')
     setVisibleToClient(false)
     setMentionDropdown({ open: false, query: '', position: 0 })
+
+    // Create a notification row for each mentioned user (skip self).
+    const recipients = mentionIds.filter(uid => uid !== currentUserId)
+    if (recipients.length > 0) {
+      const preview = body.length > 140 ? body.slice(0, 140) + '\u2026' : body
+      const rows = recipients.map(uid => ({
+        user_id: uid,
+        source_type: 'comment',
+        source_id: (data as Comment).id,
+        work_order_id: wo.id,
+        body_preview: preview,
+        author_name: currentUserName,
+        link_url: `/dashboard/wo/${wo.id}?tab=messages`,
+      }))
+      const { error: notifErr } = await supabase.from('wo_notifications').insert(rows)
+      if (notifErr) console.error('Failed to create mention notifications:', notifErr.message)
+    }
   }
 
   async function deleteComment(commentId: string) {
