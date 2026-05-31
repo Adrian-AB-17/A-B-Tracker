@@ -376,6 +376,13 @@ export default function Sidebar({
               </div>
             </div>
           </div>
+          <a
+            href="/dashboard/account"
+            className="block w-full px-3 py-1.5 text-[12px] rounded-md text-left transition-colors hover:bg-white/5 mb-0.5"
+            style={{ color: 'rgba(255,255,255,0.65)' }}
+          >
+            ⚙ Account
+          </a>
           <form action="/api/logout" method="POST">
             <button
               type="submit"
