@@ -27,11 +27,18 @@ export async function loginAction(formData: FormData) {
     }
   )
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   
   if (error) {
     return { error: error.message }
   }
 
-  redirect('/dashboard')
+  // Portal users land on /portal; team on /dashboard.
+  let dest = '/dashboard'
+  if (data?.user) {
+    const { data: pu } = await supabase
+      .from('portal_users').select('active').eq('auth_user_id', data.user.id).maybeSingle()
+    if (pu && pu.active !== false) dest = '/portal'
+  }
+  redirect(dest)
 }
