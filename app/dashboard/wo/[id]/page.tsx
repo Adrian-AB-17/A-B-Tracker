@@ -83,6 +83,13 @@ export default async function WoDetailPage({
     .or(`work_order_id.eq.${params.id},wo_number_text.ilike.%${woShortId}%`)
     .order('invoice_date', { ascending: false })
 
+  // Deliverable links (Files tab)
+  const { data: woLinks } = await supabase
+    .from('wo_links')
+    .select('*')
+    .eq('work_order_id', params.id)
+    .order('sort_order', { ascending: true })
+
   // Full team list for assignee dropdowns + @mention candidates
   const { data: team } = await supabase
     .from('team_members')
@@ -112,6 +119,7 @@ export default async function WoDetailPage({
       currentUserId={currentUserId}
       schedule={schedule || []}
       vendorInvoices={vendorInvoices || []}
+      woLinks={woLinks || []}
       isAdmin={isAdmin}
     />
   )
