@@ -18,6 +18,7 @@ import WoScheduleTab from './WoScheduleTab'
 import WoVendorInvoicesTab from './WoVendorInvoicesTab'
 import { useViewMode } from '@/lib/useViewMode'
 import { DeliverablePreview } from '@/lib/deliverablePreview'
+import WoFilesTab, { type WoLink } from './WoFilesTab'
 
 type Tab =
   | 'overview'
@@ -88,6 +89,7 @@ export default function WoDetail({
   currentUserId,
   schedule: initialSchedule,
   vendorInvoices,
+  woLinks,
   isAdmin,
 }: {
   wo: any
@@ -102,6 +104,7 @@ export default function WoDetail({
   currentUserId: string | null
   schedule: any[]
   vendorInvoices: any[]
+  woLinks: WoLink[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -251,9 +254,11 @@ export default function WoDetail({
           />
         )}
         {tab === 'files' && (
-          <Placeholder
-            title="Files"
-            note="URL list for v1. Per-WO folder + uploads come with the portal in Phase 2."
+          <WoFilesTab
+            woId={wo.id}
+            initialLinks={woLinks}
+            primaryLink={wo.deliverables_link || null}
+            isAdmin={isAdmin}
           />
         )}
         {tab === 'schedule' && (
