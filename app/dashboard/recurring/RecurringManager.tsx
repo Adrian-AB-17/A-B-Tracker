@@ -143,48 +143,59 @@ export default function RecurringManager({
         </button>
       </div>
 
-      {/* List grouped by client */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr className="text-left text-[11px] text-gray-500 uppercase tracking-wider">
-              <th className="px-6 py-3">Client</th>
-              <th className="px-6 py-3">Service</th>
-              <th className="px-6 py-3">Type</th>
-              <th className="px-6 py-3 text-right">Monthly</th>
-              <th className="px-6 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {grouped.map(g => g.entries.map((e, idx) => (
-              <tr key={e.id} className={`hover:bg-gray-50 ${!e.active ? 'opacity-50' : ''}`}>
-                <td className="px-6 py-3 font-medium text-gray-900">{idx === 0 ? g.name : ''}</td>
-                <td className="px-6 py-3 text-gray-700">
-                  {e.label}
-                  {e.coverage_notes && <div className="text-xs text-gray-400">{e.coverage_notes}</div>}
-                </td>
-                <td className="px-6 py-3">
-                  {e.is_bundle
-                    ? <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-200">Bundle</span>
-                    : <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-medium bg-gray-50 text-gray-600 border border-gray-200">Itemized</span>}
-                  {!e.active && <span className="ml-1 inline-flex px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">Paused</span>}
-                </td>
-                <td className="px-6 py-3 text-right font-mono font-semibold text-gray-900">{fmt(Number(e.amount) || 0)}</td>
-                <td className="px-6 py-3 text-right whitespace-nowrap">
-                  <button onClick={() => togglePause(e)} disabled={busy}
-                    className="text-xs text-gray-500 hover:text-gray-800 mr-3">
-                    {e.active ? 'Pause' : 'Resume'}
-                  </button>
-                  <button onClick={() => remove(e)} disabled={busy}
-                    className="text-xs text-red-500 hover:text-red-700">Delete</button>
-                </td>
-              </tr>
-            )))}
-            {rows.length === 0 && (
-              <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-400 text-sm">No recurring services yet. Add one above.</td></tr>
-            )}
-          </tbody>
-        </table>
+      {/* List grouped by client — WO-style cards */}
+      <div className="space-y-6">
+        {grouped.map(g => (
+          <div key={g.name}>
+            <div className="flex items-center justify-between mb-2 px-1">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-900"></span>
+                <h3 className="font-semibold text-gray-900 text-sm">{g.name}</h3>
+              </div>
+              <span className="text-xs font-mono text-gray-500">{fmt(g.subtotal)}/mo</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {g.entries.map(e => (
+                <div
+                  key={e.id}
+                  className={`bg-white rounded-lg border p-4 flex flex-col gap-2 transition-opacity ${e.active ? 'border-gray-200' : 'border-gray-200 opacity-55'}`}
+                  style={e.active ? { borderLeft: '3px solid var(--brand-accent)' } : { borderLeft: '3px solid #d1d5db' }}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="font-medium text-gray-900 text-sm leading-snug">{e.label}</div>
+                    {e.is_bundle
+                      ? <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200 flex-shrink-0">Bundle</span>
+                      : <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-500 border border-gray-200 flex-shrink-0">Itemized</span>}
+                  </div>
+                  {e.coverage_notes && <div className="text-xs text-gray-400 leading-snug">{e.coverage_notes}</div>}
+                  <div className="text-xl font-bold font-mono text-gray-900">{fmt(Number(e.amount) || 0)}<span className="text-xs font-normal text-gray-400">/mo</span></div>
+                  <div className="flex items-center justify-between mt-1 pt-2 border-t border-gray-50">
+                    <button
+                      onClick={() => togglePause(e)}
+                      disabled={busy}
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors disabled:opacity-50 ${
+                        e.active
+                          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                          : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                      }`}
+                      title={e.active ? 'Click to pause (removes from MRR)' : 'Click to reactivate'}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${e.active ? 'bg-green-500' : 'bg-amber-500'}`}></span>
+                      {e.active ? 'Active' : 'Paused'}
+                    </button>
+                    <button onClick={() => remove(e)} disabled={busy}
+                      className="text-[11px] text-gray-400 hover:text-red-600 transition-colors">Delete</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <div className="bg-white rounded-lg border border-gray-200 px-6 py-8 text-center text-gray-400 text-sm">
+            No recurring services yet. Add one above.
+          </div>
+        )}
       </div>
     </div>
   )
