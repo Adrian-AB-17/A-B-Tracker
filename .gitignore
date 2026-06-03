@@ -12,3 +12,8 @@ docs/
 
 # TypeScript incremental build cache (local-only)
 *.tsbuildinfo
+
+# Build/migration scripts (local only)
+*.sql
+*.mjs
+*.py
