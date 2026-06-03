@@ -22,6 +22,8 @@ export function buildEmbed(raw: string): Embed {
     if (m) return { kind: 'iframe', url: `https://docs.google.com/presentation/d/${m[1]}/embed?start=false&loop=false` }
   }
   if (host === 'drive.google.com') {
+    // Folder URLs — never embeddable, skip to fallback
+    if (path.includes('/folders/')) return null
     const m = path.match(/\/file\/d\/([^/]+)/)
     if (m) return { kind: 'iframe', url: `https://drive.google.com/file/d/${m[1]}/preview` }
     const id = url.searchParams.get('id')
@@ -33,6 +35,8 @@ export function buildEmbed(raw: string): Embed {
     if (m) return { kind: 'iframe', url: `https://docs.google.com/${seg}/d/${m[1]}/preview` }
   }
   if (host === 'dropbox.com' || host.endsWith('.dropbox.com')) {
+    // /scl/fo/ = shared folder — not embeddable, triggers download loop
+    if (path.includes('/scl/fo/')) return null
     let raw2 = href.replace(/([?&])dl=\d/, '$1raw=1')
     if (!/[?&]raw=1/.test(raw2)) raw2 += (raw2.includes('?') ? '&raw=1' : '?raw=1')
     const rl = raw2.split('?')[0].toLowerCase()
