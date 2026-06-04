@@ -26,7 +26,7 @@ const NAV: NavItem[] = [
   { href: '/dashboard/tasks',     label: 'My Tasks',        icon: '✓', countKey: 'myTasks',  section: 'filters' },
   { href: '/dashboard/tasks/all', label: 'All Tasks',       icon: '✓✓', section: 'filters' },
   { href: '/dashboard/messages',  label: 'Messages',        icon: '💬', section: 'filters' },
-  { href: '/dashboard/standup',   label: 'Standup',         icon: '☀️', section: 'filters' },
+  { href: '/dashboard/standup',   label: 'HQ',         icon: '☀️', section: 'filters' },
   { href: '/dashboard/mentions',  label: 'My Mentions',     icon: '@', section: 'filters' },
   { href: '/dashboard/recent',    label: 'Recent Changes',  icon: '🔔', section: 'filters' },
 ]
