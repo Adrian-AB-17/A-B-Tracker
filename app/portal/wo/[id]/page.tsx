@@ -12,7 +12,7 @@ export default async function PortalWoPage({ params }: { params: { id: string } 
   // RLS ensures this only returns the WO if it belongs to the user's client.
   const { data: wo } = await supabase
     .from('work_orders')
-    .select(`id, title, stage, due_date, est_cost, add_cost, deliverables_link, description, branch,
+    .select(`id, title, stage, due_date, est_cost, add_cost, deliverables_link, description, notes, branch,
              services!work_orders_service_id_fkey(name)`)
     .eq('id', params.id)
     .maybeSingle()
@@ -40,7 +40,23 @@ export default async function PortalWoPage({ params }: { params: { id: string } 
     .eq('work_order_id', params.id)
     .order('sort_order', { ascending: true })
 
+  // Campaign line items
+  const { data: lineItems } = await supabase
+    .from('wo_line_items')
+    .select('id, description, qty, unit_price, total')
+    .eq('work_order_id', params.id)
+    .order('sort_order', { ascending: true })
+
+  // Schedule
+  const { data: schedule } = await supabase
+    .from('wo_schedule')
+    .select('id, scheduled_date, scheduled_time, type, title, status')
+    .eq('work_order_id', params.id)
+    .neq('status', 'cancelled')
+    .order('scheduled_date', { ascending: true })
+
   return (
-    <PortalWoDetail wo={woNorm} initialComments={comments || []} woLinks={woLinks || []} currentUserId={user.id} />
+    <PortalWoDetail wo={woNorm} initialComments={comments || []} woLinks={woLinks || []}
+      lineItems={lineItems || []} schedule={schedule || []} currentUserId={user.id} />
   )
 }

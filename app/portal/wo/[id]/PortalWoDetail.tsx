@@ -7,7 +7,9 @@ import { DeliverablePreview } from '@/lib/deliverablePreview'
 
 type WO = { id: string; title: string; stage: string; due_date: string | null;
   est_cost: number; add_cost: number; deliverables_link: string | null;
-  description: string | null; branch: string | null; services?: { name?: string } | null }
+  description: string | null; notes: string | null; branch: string | null; services?: { name?: string } | null }
+type LineItem = { id: string; description: string | null; qty: number | null; unit_price: number | null; total: number | null }
+type SchedItem = { id: string; scheduled_date: string; scheduled_time: string | null; type: string; title: string | null; status: string }
 type Comment = { id: string; body: string; author_id: string | null; author_type: string; created_at: string }
 type WoLink = { id: string; label: string | null; url: string; sort_order: number }
 
@@ -64,8 +66,8 @@ function renderBody(text: string, onClient: boolean): React.ReactNode[] {
 }
 
 export default function PortalWoDetail({
-  wo, initialComments, woLinks, currentUserId,
-}: { wo: WO; initialComments: Comment[]; woLinks: WoLink[]; currentUserId: string }) {
+  wo, initialComments, woLinks, lineItems, schedule, currentUserId,
+}: { wo: WO; initialComments: Comment[]; woLinks: WoLink[]; lineItems: LineItem[]; schedule: SchedItem[]; currentUserId: string }) {
   const router = useRouter()
   const supabase = createClient()
   const [comments, setComments] = useState<Comment[]>(initialComments)
@@ -106,8 +108,15 @@ export default function PortalWoDetail({
           {wo.branch ? ` · ${wo.branch}` : ''}
           {wo.due_date ? ` · due ${new Date(wo.due_date + 'T00:00:00').toLocaleDateString()}` : ''}
           {showCost ? ` · ${money(cost)}` : ''}
+          {' · '}<span style={{ fontFamily: 'monospace', fontSize: 11 }}>WO-{wo.id.slice(0, 8)}</span>
         </div>
         {wo.description && <p style={{ marginTop: 14, fontSize: 14, color: '#1c1b18', whiteSpace: 'pre-wrap' }}>{wo.description}</p>}
+        {wo.notes && (
+          <div style={{ marginTop: 14, padding: '12px 14px', background: '#faf8f1', borderRadius: 8, border: '1px solid #e8e6dd' }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#6b6a63', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Notes</div>
+            <p style={{ fontSize: 13, color: '#1c1b18', whiteSpace: 'pre-wrap', margin: 0 }}>{wo.notes}</p>
+          </div>
+        )}
         {wo.deliverables_link && (
           <div style={{ marginTop: 14 }}>
             <DeliverablePreview link={wo.deliverables_link} label="Primary deliverable" />
@@ -120,6 +129,59 @@ export default function PortalWoDetail({
           </div>
         ))}
       </div>
+
+      {/* Campaign Items */}
+      {lineItems.length > 0 && (
+        <div style={{ background: 'white', border: '1px solid #e8e6dd', borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e8e6dd', fontFamily: 'Georgia, serif', fontSize: 17, color: '#0f1b34' }}>Campaign Items</div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#faf8f1' }}>
+                <th style={{ padding: '10px 20px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#6b6a63', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Item</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontSize: 11, fontWeight: 700, color: '#6b6a63', textTransform: 'uppercase', letterSpacing: '0.06em', width: 60 }}>Qty</th>
+                <th style={{ padding: '10px 20px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#6b6a63', textTransform: 'uppercase', letterSpacing: '0.06em', width: 100 }}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lineItems.map((item, i) => (
+                <tr key={item.id} style={{ borderTop: i === 0 ? 'none' : '1px solid #f0ede4' }}>
+                  <td style={{ padding: '10px 20px', fontSize: 13, color: '#1c1b18' }}>{item.description || '—'}</td>
+                  <td style={{ padding: '10px 12px', textAlign: 'center', fontSize: 13, color: '#6b6a63' }}>{item.qty ?? '—'}</td>
+                  <td style={{ padding: '10px 20px', textAlign: 'right', fontSize: 13, color: '#1c1b18', fontFamily: 'monospace' }}>
+                    {item.total != null ? money(item.total) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Schedule */}
+      {schedule.length > 0 && (
+        <div style={{ background: 'white', border: '1px solid #e8e6dd', borderRadius: 12, overflow: 'hidden', marginBottom: 20 }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e8e6dd', fontFamily: 'Georgia, serif', fontSize: 17, color: '#0f1b34' }}>Schedule</div>
+          <div style={{ padding: '8px 20px 16px' }}>
+            {schedule.map((s, i) => (
+              <div key={s.id} style={{ display: 'grid', gridTemplateColumns: '48px 1fr', gap: 12, padding: '12px 0',
+                borderTop: i === 0 ? 'none' : '1px solid #f0ede4' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 9, textTransform: 'uppercase', color: '#6b6a63', letterSpacing: '0.08em' }}>
+                    {new Date(s.scheduled_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short' })}
+                  </div>
+                  <div style={{ fontFamily: 'Georgia, serif', fontSize: 18, fontWeight: 600, color: '#0f1b34' }}>
+                    {new Date(s.scheduled_date + 'T00:00:00').getDate()}
+                  </div>
+                </div>
+                <div style={{ borderLeft: '3px solid #d99e2b', paddingLeft: 12, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#0f1b34' }}>{s.title || s.type}</div>
+                  <div style={{ fontSize: 12, color: '#6b6a63', marginTop: 2 }}>{s.type}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div style={{ background: 'white', border: '1px solid #e8e6dd', borderRadius: 12, overflow: 'hidden' }}>
