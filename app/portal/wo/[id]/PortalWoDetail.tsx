@@ -7,7 +7,7 @@ import { DeliverablePreview } from '@/lib/deliverablePreview'
 
 type WO = { id: string; title: string; stage: string; due_date: string | null;
   est_cost: number; add_cost: number; deliverables_link: string | null;
-  description: string | null; notes: string | null; branch: string | null;
+  description: string | null; notes_external: string | null; branch: string | null;
   created_at: string | null; priority: string | null; occurrence: string | null;
   services?: { name?: string } | null }
 type LineItem = { id: string; description: string | null; qty: number | null; unit_price: number | null; total: number | null }
@@ -165,10 +165,10 @@ export default function PortalWoDetail({
         </div>
 
         {wo.description && <p style={{ marginTop: 14, fontSize: 14, color: '#1c1b18', whiteSpace: 'pre-wrap' }}>{wo.description}</p>}
-        {wo.notes && (
+        {wo.notes_external && (
           <div style={{ marginTop: 14, padding: '12px 14px', background: '#faf8f1', borderRadius: 8, border: '1px solid #e8e6dd' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: '#6b6a63', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Notes</div>
-            <p style={{ fontSize: 13, color: '#1c1b18', whiteSpace: 'pre-wrap', margin: 0 }}>{wo.notes}</p>
+            <p style={{ fontSize: 13, color: '#1c1b18', whiteSpace: 'pre-wrap', margin: 0 }}>{wo.notes_external}</p>
           </div>
         )}
         {wo.deliverables_link && (

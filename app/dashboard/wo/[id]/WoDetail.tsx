@@ -142,7 +142,7 @@ export default function WoDetail({
       params.set('tab', next)
     }
     const query = params.toString()
-    router.replace(`/dashboard/wo/$WO-{wo.id.slice(0, 8)}${query ? '?' + query : ''}`, { scroll: false })
+    router.replace(`/dashboard/wo/${wo.id}${query ? '?' + query : ''}`, { scroll: false })
   }
 
   const clientName = wo.clients?.name || 'Unknown client'
@@ -156,6 +156,15 @@ export default function WoDetail({
     setLineItems(updated)
   }, [])
 
+  async function deleteWo() {
+    if (!isAdmin) return
+    if (!confirm(`Permanently delete "${wo.title}"? This cannot be undone.`)) return
+    const supabaseDel = createClient()
+    const { error } = await supabaseDel.from('work_orders').delete().eq('id', wo.id)
+    if (error) { alert('Delete failed: ' + error.message); return }
+    router.push('/dashboard')
+  }
+
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
       {/* Hero header */}
@@ -166,6 +175,13 @@ export default function WoDetail({
         <div className="max-w-[1400px] mx-auto">
           <div className="text-sm mb-2" style={{ color: 'var(--text-muted)' }}>
             <BackToBoardLink />
+            {isAdmin && (
+              <button onClick={deleteWo}
+                className="text-xs font-semibold px-3 py-1.5 rounded ml-2"
+                style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5' }}>
+                🗑 Delete WO
+              </button>
+            )}
           </div>
 
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -534,6 +550,23 @@ function OverviewTab({
           <div style={{ color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 14 }}>{wo.description}</div>
         ) : (
           <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No notes yet.</div>
+        )}
+      </Card>
+
+      <Card title="📤 Client Notes">
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+          🔓 Visible to client in the portal
+        </div>
+        {isAdmin ? (
+          <textarea defaultValue={woState.notes_external || ''} rows={3}
+            placeholder="Notes visible to the client (optional)…"
+            onBlur={e => saveField('notes_external', e.target.value)}
+            className="w-full rounded border px-3 py-2 text-sm"
+            style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)', lineHeight: 1.5, resize: 'vertical' }} />
+        ) : woState.notes_external ? (
+          <div style={{ color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.5, fontSize: 14 }}>{woState.notes_external}</div>
+        ) : (
+          <div style={{ color: 'var(--text-muted)', fontStyle: 'italic' }}>No client notes.</div>
         )}
       </Card>
 

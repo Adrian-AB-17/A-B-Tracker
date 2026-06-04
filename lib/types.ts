@@ -41,6 +41,7 @@ export interface WorkOrder {
   deliverables_link?: string | null
   notes_link?: string | null
   notes?: string | null
+  notes_external?: string | null
   flagged?: boolean
   issue?: string | null
   created_at: string
@@ -75,6 +76,7 @@ export interface ClientRate {
   service_id: string
   price: number
   notes?: string | null
+  notes_external?: string | null
   effective_from?: string  // date
   created_at: string
 }
