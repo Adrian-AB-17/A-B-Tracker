@@ -142,7 +142,7 @@ export default function WoDetail({
       params.set('tab', next)
     }
     const query = params.toString()
-    router.replace(`/dashboard/wo/${wo.id}${query ? '?' + query : ''}`, { scroll: false })
+    router.replace(`/dashboard/wo/$WO-{wo.id.slice(0, 8)}${query ? '?' + query : ''}`, { scroll: false })
   }
 
   const clientName = wo.clients?.name || 'Unknown client'
@@ -189,7 +189,7 @@ export default function WoDetail({
                 <span>Owner: {ownerName}</span>
                 <span>·</span>
                 <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>
-                  {wo.id}
+                  WO-{wo.id.slice(0, 8)}
                 </span>
               </div>
             </div>
