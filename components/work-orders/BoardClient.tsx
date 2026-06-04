@@ -759,7 +759,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   }, [selectedWo, openWoLineItemTotal, lineItemTotalsByWo])
 
   return (
-    <div className="h-full flex flex-col" style={{ background: 'var(--bg)' }}>
+    <div className="flex flex-col" style={{ background: 'var(--bg)' }}>
       {/* Active filter banner */}
       {hasUrlFilters && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 md:px-6 py-2 flex items-center justify-between gap-3">
@@ -957,7 +957,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       )}
 
       {/* Desktop */}
-      <div className="hidden md:block flex-1 overflow-x-auto px-6 py-4">
+      <div className="hidden md:block overflow-x-auto px-6 py-4">
         <div className="flex gap-3 min-w-max">
           {BOARD_STAGES.map(stageId => {
             const stage = STAGES.find(s => s.id === stageId)!

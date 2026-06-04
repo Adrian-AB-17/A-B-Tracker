@@ -208,6 +208,9 @@ export default function PortalClient({
                     </div>
                   </div>
                   <div style={{ borderLeft: '3px solid #d99e2b', paddingLeft: 12 }}>
+                    {(() => { const wo = workOrders.find((w: WO) => w.id === s.work_order_id); return wo ? (
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#b8860b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>{wo.title}</div>
+                    ) : null })()}
                     <div style={{ fontSize: 14, fontWeight: 600, color: '#0f1b34' }}>{s.title || s.type}</div>
                     <div style={{ fontSize: 12.5, color: '#6b6a63', marginTop: 2 }}>{s.type}</div>
                   </div>
