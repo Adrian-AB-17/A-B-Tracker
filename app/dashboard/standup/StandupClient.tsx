@@ -20,6 +20,7 @@ export type WoOption = { id: string; title: string; clientName: string | null }
 export type Reaction = { id: string; post_id: string; user_id: string; emoji: string }
 
 const CHANNELS: { id: string; label: string }[] = [
+  { id: 'general', label: '🎉 General' },
   { id: 'standup', label: '☀️ Standup' },
   { id: 'design',  label: '🎨 Design' },
   { id: 'ads',     label: '📣 Ads' },
