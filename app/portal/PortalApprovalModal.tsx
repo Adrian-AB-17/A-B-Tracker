@@ -5,6 +5,7 @@ import { DeliverablePreview } from '@/lib/deliverablePreview'
 
 type WO = { id: string; title: string; stage: string; deliverables_link: string | null;
   due_date?: string | null; description?: string | null; notes?: string | null; branch?: string | null;
+  est_cost?: number | null; add_cost?: number | null; priority?: string | null; occurrence?: string | null; created_at?: string | null;
   services?: { name?: string } | null }
 
 export default function PortalApprovalModal({
@@ -80,6 +81,55 @@ export default function PortalApprovalModal({
           )}
         </div>
         <div style={{ padding: '22px 26px' }}>
+          {/* Info cards */}
+          {(() => {
+            const money = (n: number | null | undefined) => '$' + ((n || 0)).toLocaleString(undefined, { maximumFractionDigits: 2 })
+            const total = (wo.est_cost || 0) + (wo.add_cost || 0)
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 18 }}>
+                <div style={{ background: '#faf8f1', borderRadius: 8, padding: '10px 12px', border: '1px solid #e8e6dd' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#6b6a63', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>💰 Costs</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b6a63', marginBottom: 3 }}>
+                    <span>Est. cost</span><span style={{ color: '#1c1b18', fontFamily: 'monospace' }}>{money(wo.est_cost)}</span>
+                  </div>
+                  {(wo.add_cost || 0) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b6a63', marginBottom: 3 }}>
+                      <span>Add-on</span><span style={{ color: '#1c1b18', fontFamily: 'monospace' }}>{money(wo.add_cost)}</span>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: '#0f1b34', borderTop: '1px solid #e8e6dd', paddingTop: 4, marginTop: 3 }}>
+                    <span>Total</span><span style={{ fontFamily: 'monospace' }}>{money(total)}</span>
+                  </div>
+                </div>
+                <div style={{ background: '#faf8f1', borderRadius: 8, padding: '10px 12px', border: '1px solid #e8e6dd' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#6b6a63', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>📅 Dates</div>
+                  {wo.created_at && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b6a63', marginBottom: 3 }}>
+                      <span>Submitted</span><span style={{ color: '#1c1b18' }}>{new Date(wo.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    </div>
+                  )}
+                  {wo.due_date && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b6a63' }}>
+                      <span>Due</span><span style={{ color: '#1c1b18', fontWeight: 600 }}>{new Date(wo.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ background: '#faf8f1', borderRadius: 8, padding: '10px 12px', border: '1px solid #e8e6dd' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#6b6a63', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>🏷 Status</div>
+                  {wo.priority && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b6a63', marginBottom: 3 }}>
+                      <span>Priority</span><span style={{ color: '#1c1b18', textTransform: 'capitalize' }}>{wo.priority}</span>
+                    </div>
+                  )}
+                  {wo.occurrence && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#6b6a63' }}>
+                      <span>Type</span><span style={{ color: '#1c1b18' }}>{wo.occurrence}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
           {wo.deliverables_link && (
             <div style={{ marginBottom: 18 }}>
               <DeliverablePreview link={wo.deliverables_link} label="Primary deliverable" />
