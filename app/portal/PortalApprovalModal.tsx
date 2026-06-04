@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/client'
 import { DeliverablePreview } from '@/lib/deliverablePreview'
 
 type WO = { id: string; title: string; stage: string; deliverables_link: string | null;
+  due_date?: string | null; description?: string | null; notes?: string | null; branch?: string | null;
   services?: { name?: string } | null }
 
 export default function PortalApprovalModal({
@@ -63,7 +64,20 @@ export default function PortalApprovalModal({
           <div style={{ fontSize: 11, color: '#ea580c', textTransform: 'uppercase', letterSpacing: '0.12em',
                         fontWeight: 700, marginBottom: 6 }}>Awaiting your approval</div>
           <div style={{ fontFamily: 'Georgia, serif', fontSize: 22, color: '#0f1b34' }}>{wo.title}</div>
-          <div style={{ fontSize: 13, color: '#6b6a63', marginTop: 4 }}>{wo.services?.name || 'Project'}</div>
+          <div style={{ fontSize: 13, color: '#6b6a63', marginTop: 4 }}>
+            {wo.services?.name || 'Project'}
+            {wo.branch ? ` · ${wo.branch}` : ''}
+            {wo.due_date ? ` · due ${new Date(wo.due_date + 'T00:00:00').toLocaleDateString()}` : ''}
+          </div>
+          {wo.description && (
+            <p style={{ fontSize: 13, color: '#1c1b18', marginTop: 10, whiteSpace: 'pre-wrap' }}>{wo.description}</p>
+          )}
+          {wo.notes && (
+            <div style={{ marginTop: 10, padding: '10px 12px', background: '#faf8f1', borderRadius: 8, border: '1px solid #e8e6dd' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#6b6a63', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Notes</div>
+              <p style={{ fontSize: 13, color: '#1c1b18', whiteSpace: 'pre-wrap', margin: 0 }}>{wo.notes}</p>
+            </div>
+          )}
         </div>
         <div style={{ padding: '22px 26px' }}>
           {wo.deliverables_link && (

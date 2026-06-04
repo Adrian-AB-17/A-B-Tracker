@@ -20,7 +20,7 @@ export default async function PortalPage() {
   const { data: workOrders } = await supabase
     .from('work_orders')
     .select(`id, title, stage, service_id, due_date, est_cost, add_cost, created_at,
-             deliverables_link, description, branch,
+             deliverables_link, description, notes, branch,
              services!work_orders_service_id_fkey(name)`)
     .order('created_at', { ascending: false })
 

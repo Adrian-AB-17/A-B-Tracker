@@ -8,7 +8,7 @@ import PortalRequestModal from './PortalRequestModal'
 type WO = {
   id: string; title: string; stage: string; service_id: string | null;
   due_date: string | null; est_cost: number; add_cost: number; created_at: string;
-  deliverables_link: string | null; description: string | null; branch: string | null;
+  deliverables_link: string | null; description: string | null; notes: string | null; branch: string | null;
   services?: { name?: string } | null;
 }
 type Sched = { id: string; work_order_id: string; scheduled_date: string;
