@@ -128,6 +128,27 @@ export default function ScheduleGlobalView({
   clients: ClientLite[]
 }) {
   const router = useRouter()
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
+
+  async function syncFromCalendar() {
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const res = await fetch('/api/calendar/sync', { method: 'POST', body: '{}', headers: { 'Content-Type': 'application/json' } })
+      const data = await res.json()
+      if (data.ok) {
+        setSyncResult(`✅ Synced ${data.inserted} new events (${data.matched} matched, ${data.skipped} skipped)`)
+        router.refresh()
+      } else {
+        setSyncResult(`❌ Sync failed: ${data.error}`)
+      }
+    } catch (e: any) {
+      setSyncResult(`❌ Error: ${e.message}`)
+    } finally {
+      setSyncing(false)
+    }
+  }
   const teamById: Record<string, string> = Object.fromEntries(team.map(t => [t.id, t.name]))
 
   // Filters
@@ -181,13 +202,21 @@ export default function ScheduleGlobalView({
   return (
     <div className="p-6 max-w-screen-2xl mx-auto space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-3xl font-bold" style={{ fontFamily: 'Fraunces, serif' }}>
-          📅 Execution Schedule
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          What is going out across all clients and work orders, all in one place.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold" style={{ fontFamily: 'Fraunces, serif' }}>
+            📅 Execution Schedule
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            What is going out across all clients and work orders, all in one place.
+          </p>
+          {syncResult && <p className="text-xs mt-1 font-medium" style={{ color: syncResult.startsWith('✅') ? '#16a34a' : '#dc2626' }}>{syncResult}</p>}
+        </div>
+        <button onClick={syncFromCalendar} disabled={syncing}
+          className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
+          style={{ background: '#1a2744', color: '#b8860b', opacity: syncing ? 0.6 : 1 }}>
+          {syncing ? '⏳ Syncing...' : '📅 Sync from Google Calendar'}
+        </button>
       </div>
 
       {/* THIS WEEK summary chips */}
