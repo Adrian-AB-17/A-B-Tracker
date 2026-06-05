@@ -4,6 +4,26 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+async function syncToCalendar(
+  action: 'create' | 'update' | 'delete',
+  row: any,
+  woTitle: string,
+  googleEventId?: string | null
+): Promise<string | null> {
+  try {
+    const res = await fetch('/api/calendar/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, scheduleRow: { ...row, google_event_id: googleEventId }, woTitle }),
+    })
+    const data = await res.json()
+    return data.google_event_id || null
+  } catch (e) {
+    console.error('Calendar sync error:', e)
+    return null
+  }
+}
+
 // Schedule types (8 from prototype) with icons + labels
 const SCHEDULE_TYPES = [
   { id: 'email',       label: 'Email blast',     icon: '📧' },
@@ -144,6 +164,13 @@ export default function WoScheduleTab({
       return
     }
     setRows(prev => [...prev, data as ScheduleRow])
+
+    // Sync to Google Calendar
+    const googleEventId = await syncToCalendar('create', data, wo.title)
+    if (googleEventId) {
+      await supabase.from('wo_schedule').update({ google_event_id: googleEventId, calendar_synced: true }).eq('id', data.id)
+      setRows(prev => prev.map(r => r.id === data.id ? { ...r, google_event_id: googleEventId, calendar_synced: true } : r))
+    }
   }
 
   async function updateRow(id: string, patch: Partial<ScheduleRow>) {
@@ -157,6 +184,19 @@ export default function WoScheduleTab({
       .eq('id', id)
 
     setBusyId(null)
+
+    // Sync relevant field changes to Google Calendar
+    if (!updateErr && (patch.scheduled_date || patch.scheduled_time || patch.title || patch.type)) {
+      const currentRow = rows.find(r => r.id === id)
+      if (currentRow) {
+        const updatedRow = { ...currentRow, ...patch }
+        const googleEventId = await syncToCalendar('update', updatedRow, wo.title, currentRow.google_event_id)
+        if (googleEventId && googleEventId !== currentRow.google_event_id) {
+          await supabase.from('wo_schedule').update({ google_event_id: googleEventId, calendar_synced: true }).eq('id', id)
+          setRows(prev => prev.map(r => r.id === id ? { ...r, google_event_id: googleEventId, calendar_synced: true } : r))
+        }
+      }
+    }
 
     if (updateErr) {
       setError(updateErr.message)
@@ -173,6 +213,7 @@ export default function WoScheduleTab({
 
   async function deleteRow(id: string) {
     if (!confirm('Delete this scheduled date?')) return
+    const rowToDelete = rows.find(r => r.id === id)
     setError(null)
     setBusyId(id)
 
@@ -188,6 +229,11 @@ export default function WoScheduleTab({
       return
     }
     setRows(prev => prev.filter(r => r.id !== id))
+
+    // Delete from Google Calendar
+    if (rowToDelete?.google_event_id) {
+      syncToCalendar('delete', rowToDelete, wo.title, rowToDelete.google_event_id)
+    }
   }
 
   return (
