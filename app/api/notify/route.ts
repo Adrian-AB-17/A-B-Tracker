@@ -86,6 +86,26 @@ function stageEmail(
   return { subject, html }
 }
 
+async function sendSms(to: string, body: string) {
+  const sid = process.env.TWILIO_ACCOUNT_SID
+  const token = process.env.TWILIO_AUTH_TOKEN
+  const from = process.env.TWILIO_FROM_NUMBER
+  if (!sid || !token || !from) return
+  if (!to.startsWith('+1')) return // US only for now
+  try {
+    await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ To: to, From: from, Body: body }).toString(),
+    })
+  } catch (e) {
+    console.error('SMS error:', e)
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { notifications, wo_title, wo_id, sender_name } = await req.json() as {
@@ -117,14 +137,14 @@ export async function POST(req: NextRequest) {
     const uniqueClientIds = [...new Set(clientIds)]
 
     // Fetch team member emails
-    const emailMap = new Map<string, { name: string; email: string }>()
+    const emailMap = new Map<string, { name: string; email: string; phone?: string | null }>()
     if (uniqueTeamIds.length) {
       const { data: members } = await supabaseAdmin
         .from('team_members')
-        .select('auth_user_id, name, email')
+        .select('auth_user_id, name, email, phone')
         .in('auth_user_id', uniqueTeamIds)
       ;(members || []).forEach((m: any) => {
-        if (m.auth_user_id) emailMap.set(m.auth_user_id, { name: m.name, email: m.email })
+        if (m.auth_user_id) emailMap.set(m.auth_user_id, { name: m.name, email: m.email, phone: m.phone || null })
       })
     }
 
@@ -201,8 +221,12 @@ export async function POST(req: NextRequest) {
         }),
       })
 
-      if (res.ok) sent++
-      else {
+      if (res.ok) {
+        sent++
+        // Also send SMS for US numbers
+        const member = recipientEmail ? [...emailMap.values()].find(m => m.email === recipientEmail) : null
+        if (member?.phone) await sendSms(member.phone, `A&B Tracker: ${subject}`)
+      } else {
         const err = await res.text()
         console.error(`Resend error for ${recipientEmail}:`, err)
       }
