@@ -1,7 +1,19 @@
 'use client'
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 
 type Message = { role: 'user' | 'assistant'; content: string }
+
+function renderMarkdown(text: string): React.ReactNode[] {
+  const lines = text.split('\n')
+  return lines.map((line, i) => {
+    // Bold: **text**
+    const parts = line.split(/\*\*(.*?)\*\*/g)
+    const rendered = parts.map((part, j) =>
+      j % 2 === 1 ? <strong key={j}>{part}</strong> : <span key={j}>{part}</span>
+    )
+    return <div key={i} style={{ minHeight: line === '' ? '0.5em' : undefined }}>{rendered}</div>
+  })
+}
 
 export default function ClaudeClient({
   authUserId, role, memberName,
@@ -94,9 +106,9 @@ export default function ClaudeClient({
                 background: m.role === 'user' ? '#1a2744' : 'var(--bg-elevated)',
                 color: m.role === 'user' ? '#f5f3ec' : 'var(--text)',
                 border: m.role === 'assistant' ? '1px solid var(--border)' : 'none',
-                fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap',
+                fontSize: 14, lineHeight: 1.6,
               }}>
-                {m.content}
+                {m.role === 'assistant' ? renderMarkdown(m.content) : m.content}
               </div>
             </div>
           ))}
