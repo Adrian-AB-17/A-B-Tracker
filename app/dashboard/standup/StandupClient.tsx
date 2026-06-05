@@ -67,7 +67,11 @@ export default function StandupClient({
   const supabase = createClient()
   const [posts, setPosts] = useState<WallPost[]>(initialPosts)
   const [reactions, setReactions] = useState<Reaction[]>(initialReactions)
-  const [channel, setChannel] = useState<string>('standup')
+  const initialChannel = (() => {
+    if (typeof window === 'undefined') return 'standup'
+    return new URLSearchParams(window.location.search).get('channel') || 'standup'
+  })()
+  const [channel, setChannel] = useState<string>(initialChannel)
 
   const [body, setBody] = useState('')
   const [posting, setPosting] = useState(false)
