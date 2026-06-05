@@ -81,6 +81,7 @@ export default function ClientsClient({
   services,
   clientRates: initialRates,
   portalUsers,
+  recurringServices = [],
 }: {
   clients: Client[]
   workOrders: WO[]
@@ -88,6 +89,7 @@ export default function ClientsClient({
   services: Service[]
   clientRates: ClientRate[]
   portalUsers: PortalUser[]
+  recurringServices?: { client_id: string; amount: number; active: boolean }[]
 }) {
   const isAdmin = currentMember?.role === 'admin'
   const portalByClient = useMemo(() => {
@@ -440,6 +442,11 @@ export default function ClientsClient({
     }
   }
 
+  const mrrByClient = (recurringServices || []).reduce((acc: Record<string, number>, r) => {
+    if (r.active) acc[r.client_id] = (acc[r.client_id] || 0) + Number(r.amount)
+    return acc
+  }, {})
+
   const showModal = !!selected || isNew
 
   return (
@@ -496,6 +503,7 @@ export default function ClientsClient({
               <th className="px-4 md:px-6 py-3 hidden sm:table-cell">Status</th>
               <th className="px-4 md:px-6 py-3 text-right">WOs</th>
               <th className="px-4 md:px-6 py-3 text-right hidden sm:table-cell">Active</th>
+              <th className="px-4 md:px-6 py-3 text-right hidden sm:table-cell">MRR</th>
               <th className="px-4 md:px-6 py-3 text-right">Pipeline</th>
             </tr>
           </thead>
@@ -528,6 +536,9 @@ export default function ClientsClient({
                   </td>
                   <td className="px-4 md:px-6 py-3 text-right font-mono text-gray-700">{s.count}</td>
                   <td className="px-4 md:px-6 py-3 text-right font-mono text-gray-700 hidden sm:table-cell">{s.active}</td>
+                  <td className="px-4 md:px-6 py-3 text-right font-mono hidden sm:table-cell" style={{ color: mrrByClient[c.id] ? '#0891b2' : '#d1d5db' }}>
+                    {mrrByClient[c.id] ? '$' + mrrByClient[c.id].toLocaleString() : '—'}
+                  </td>
                   <td className="px-4 md:px-6 py-3 text-right font-mono font-semibold text-gray-900">
                     ${s.pipeline.toLocaleString()}
                   </td>
