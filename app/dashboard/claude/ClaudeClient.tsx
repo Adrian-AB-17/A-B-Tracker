@@ -97,13 +97,19 @@ export default function ClaudeClient({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading, processingStatus])
 
-  const suggestions = [
-    "What's overdue right now?",
-    "Show me everything in-progress for Apollo",
-    "What's waiting for client approval?",
-    "What did Tanya work on this week?",
-    "What's our pipeline value?",
-    "Which clients have the most active WOs?",
+  const suggestions: { label: string; action: string }[] = [
+    { label: "What's overdue right now?",              action: 'send' },
+    { label: "What's waiting for client approval?",    action: 'send' },
+    { label: "What's our pipeline value?",             action: 'send' },
+    { label: "What did Tanya work on this week?",      action: 'send' },
+    { label: "Which clients have the most active WOs?", action: 'send' },
+    { label: "Which client reports need approval?",    action: 'send' },
+    { label: "What did we deliver this month?",        action: 'send' },
+    { label: "Show me RBS May report",                 action: 'send' },
+    { label: "Show me in-progress for Apollo",         action: 'send' },
+    { label: "Process monthly reports",                action: 'upload' },
+    { label: "Add internal files to a WO",             action: 'send' },
+    { label: "Paste a meeting transcript",             action: 'meetings' },
   ]
 
   async function readFileAsText(file: File): Promise<string> {
@@ -397,11 +403,15 @@ export default function ClaudeClient({
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
               {suggestions.map(s => (
-                <button key={s} onClick={() => send(s)}
+                <button key={s.label} onClick={() => {
+                  if (s.action === 'upload') { fileInputRef.current?.click() }
+                  else if (s.action === 'meetings') { window.location.href = '/dashboard/meetings' }
+                  else send(s.label)
+                }}
                   style={{ padding: '8px 14px', borderRadius: 20, border: '1px solid var(--border)',
-                           background: 'var(--bg-elevated)', color: 'var(--text)', fontSize: 13,
-                           cursor: 'pointer' }}>
-                  {s}
+                           background: s.action !== 'send' ? 'var(--brand-accent-soft, #fdf6e8)' : 'var(--bg-elevated)',
+                           color: 'var(--text)', fontSize: 13, cursor: 'pointer' }}>
+                  {s.action === 'upload' ? '📎 ' : s.action === 'meetings' ? '📋 ' : ''}{s.label}
                 </button>
               ))}
             </div>
