@@ -395,72 +395,75 @@ function ScheduleTable({
   onRowClick: (r: Row) => void
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-          <tr>
-            <th className="px-4 py-2 text-left font-semibold">Date</th>
-            <th className="px-3 py-2 text-left font-semibold">Time</th>
-            <th className="px-3 py-2 text-left font-semibold">Type</th>
-            <th className="px-3 py-2 text-left font-semibold">Title</th>
-            <th className="px-3 py-2 text-left font-semibold">Work Order</th>
-            <th className="px-3 py-2 text-left font-semibold">Client</th>
-            <th className="px-3 py-2 text-left font-semibold">Owner</th>
-            <th className="px-3 py-2 text-left font-semibold">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(r => {
-            const eff = effectiveStatus(r)
-            const pill = statusPill(eff)
-            const tm = typeMeta(r.type)
-            const isCancelled = eff === 'cancelled'
-            const isPastDue = eff === 'past_due'
-            return (
-              <tr
-                key={r.id}
-                onClick={() => onRowClick(r)}
-                className="border-b border-gray-100 hover:bg-amber-50 cursor-pointer transition-colors"
-                style={{
-                  opacity: isCancelled ? 0.6 : 1,
-                  borderLeft: isPastDue ? '3px solid #dc2626' : '3px solid transparent',
-                }}
-              >
-                <td className="px-4 py-2.5 font-medium text-gray-800 whitespace-nowrap">
-                  {fmtDate(r.scheduled_date)}
-                </td>
-                <td className="px-3 py-2.5 text-gray-500 font-mono text-xs whitespace-nowrap">
-                  {fmtTime(r.scheduled_time)}
-                </td>
-                <td className="px-3 py-2.5 whitespace-nowrap">
-                  <span className="text-xs">{tm.icon}</span>{' '}
-                  <span className="text-xs text-gray-700">{tm.label}</span>
-                </td>
-                <td className="px-3 py-2.5 text-gray-700">
-                  {r.title || <span className="text-gray-400 italic">(no title)</span>}
-                </td>
-                <td className="px-3 py-2.5 text-gray-600 text-xs">
-                  {r.wo_title || '—'}
-                </td>
-                <td className="px-3 py-2.5 text-gray-600 text-xs">
-                  {r.client_name || '—'}
-                </td>
-                <td className="px-3 py-2.5 text-gray-600 text-xs">
-                  {r.owner_id ? (teamById[r.owner_id] || '—') : <span className="text-gray-400">—</span>}
-                </td>
-                <td className="px-3 py-2.5">
-                  <span
-                    className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold"
-                    style={{ background: pill.bg, color: pill.fg }}
-                  >
-                    {pill.label}
-                  </span>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+    <>
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th className="px-4 py-2 text-left font-semibold">Date</th>
+              <th className="px-3 py-2 text-left font-semibold">Time</th>
+              <th className="px-3 py-2 text-left font-semibold">Type</th>
+              <th className="px-3 py-2 text-left font-semibold">Title</th>
+              <th className="px-3 py-2 text-left font-semibold">Work Order</th>
+              <th className="px-3 py-2 text-left font-semibold">Client</th>
+              <th className="px-3 py-2 text-left font-semibold">Owner</th>
+              <th className="px-3 py-2 text-left font-semibold">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => {
+              const eff = effectiveStatus(r)
+              const pill = statusPill(eff)
+              const tm = typeMeta(r.type)
+              const isCancelled = eff === 'cancelled'
+              const isPastDue = eff === 'past_due'
+              return (
+                <tr key={r.id} onClick={() => onRowClick(r)}
+                  className="border-b border-gray-100 hover:bg-amber-50 cursor-pointer transition-colors"
+                  style={{ opacity: isCancelled ? 0.6 : 1, borderLeft: isPastDue ? '3px solid #dc2626' : '3px solid transparent' }}>
+                  <td className="px-4 py-2.5 font-medium text-gray-800 whitespace-nowrap">{fmtDate(r.scheduled_date)}</td>
+                  <td className="px-3 py-2.5 text-gray-500 font-mono text-xs whitespace-nowrap">{fmtTime(r.scheduled_time)}</td>
+                  <td className="px-3 py-2.5 whitespace-nowrap"><span className="text-xs">{tm.icon}</span>{' '}<span className="text-xs text-gray-700">{tm.label}</span></td>
+                  <td className="px-3 py-2.5 text-gray-700">{r.title || <span className="text-gray-400 italic">(no title)</span>}</td>
+                  <td className="px-3 py-2.5 text-gray-600 text-xs">{r.wo_title || '—'}</td>
+                  <td className="px-3 py-2.5 text-gray-600 text-xs">{r.client_name || '—'}</td>
+                  <td className="px-3 py-2.5 text-gray-600 text-xs">{r.owner_id ? (teamById[r.owner_id] || '—') : <span className="text-gray-400">—</span>}</td>
+                  <td className="px-3 py-2.5"><span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold" style={{ background: pill.bg, color: pill.fg }}>{pill.label}</span></td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile cards */}
+      <div className="md:hidden divide-y divide-gray-100">
+        {rows.map(r => {
+          const eff = effectiveStatus(r)
+          const pill = statusPill(eff)
+          const tm = typeMeta(r.type)
+          const isPastDue = eff === 'past_due'
+          return (
+            <div key={r.id} onClick={() => onRowClick(r)}
+              className="px-4 py-3 hover:bg-amber-50 cursor-pointer transition-colors"
+              style={{ borderLeft: isPastDue ? '3px solid #dc2626' : '3px solid transparent' }}>
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <div>
+                  <div className="font-semibold text-sm text-gray-900">{r.title || <span className="italic text-gray-400">(no title)</span>}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{r.wo_title || '—'} · {r.client_name || '—'}</div>
+                </div>
+                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold flex-shrink-0" style={{ background: pill.bg, color: pill.fg }}>{pill.label}</span>
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-1">
+                <span>📅 {fmtDate(r.scheduled_date)}{r.scheduled_time ? ' · ' + fmtTime(r.scheduled_time) : ''}</span>
+                <span>{tm.icon} {tm.label}</span>
+                {r.owner_id && teamById[r.owner_id] && <span>👤 {teamById[r.owner_id]}</span>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import MentionBadge from './MentionBadge'
 import { useViewMode } from '@/lib/useViewMode'
@@ -148,10 +149,10 @@ export default function Sidebar({
             A<span className="text-brand-accent">&amp;</span>B Tracker
           </span>
         </div>
-        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
-             style={{ background: 'var(--brand-navy)' }}>
+        <Link href="/dashboard/account" className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white hover:opacity-80 transition-opacity"
+             style={{ background: 'var(--brand-gold, #b8860b)' }}>
           {member?.name?.[0] || '?'}
-        </div>
+        </Link>
       </div>
 
       {/* Mobile overlay */}
@@ -399,6 +400,12 @@ export default function Sidebar({
           </form>
         </div>
       </aside>
+      {/* Claude floating bubble — mobile only */}
+      <Link href="/dashboard/claude"
+        className="md:hidden fixed bottom-6 right-4 z-50 w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
+        style={{ background: 'var(--brand-navy)', color: '#b8860b', fontSize: 22, fontWeight: 700, textDecoration: 'none' }}>
+        ✦
+      </Link>
     </>
   )
 }
