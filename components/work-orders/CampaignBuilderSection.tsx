@@ -2,6 +2,7 @@
 import {
   CAMPAIGN_ITEMS,
   campaignItemCost,
+  campaignItemBilled,
   campaignItemsTotal,
   isPriceOverridden,
   needsQty,
@@ -27,7 +28,7 @@ interface Props {
  *
  * Layout: stacked rows that work at any width. Each row is two visual lines —
  * (1) checkbox + name + badges + running line total
- * (2) description + price input + qty input + default-note
+ * (2) description + price input + qty input + markup % + billed amount
  *
  * Selected items are saved as wo_line_items rows on WO save.
  */
@@ -60,6 +61,17 @@ export default function CampaignBuilderSection(props: Props) {
       if (isOverridden) return { ...p, unitPrice: newPrice }
       const { unitPrice, ...rest } = p
       return rest
+    }))
+  }
+
+  function updateMarkup(itemId: string, markup: number | undefined) {
+    onChange(picks.map(p => {
+      if (p.id !== itemId) return p
+      if (!markup || markup <= 0) {
+        const { markup_percentage, ...rest } = p
+        return rest
+      }
+      return { ...p, markup_percentage: markup }
     }))
   }
 
@@ -149,7 +161,9 @@ export default function CampaignBuilderSection(props: Props) {
           const isFree = item.pricing === 'no_charge'
           const showQty = needsQty(item)
           const lineCost = isSelected ? campaignItemCost(item, qty, pick?.unitPrice) : 0
+          const billed = isSelected ? campaignItemBilled(item, qty, pick?.unitPrice, pick?.markup_percentage) : 0
           const overridden = pick && isPriceOverridden(item, pick.unitPrice)
+          const hasMarkup = isSelected && !!pick?.markup_percentage && pick.markup_percentage > 0
 
           return (
             <div
@@ -179,16 +193,34 @@ export default function CampaignBuilderSection(props: Props) {
                         title={`Default $${item.price.toLocaleString()}`}
                       >CUSTOM</span>
                     )}
+                    {hasMarkup && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 tracking-wide">
+                        +{pick!.markup_percentage}% markup
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div
-                  className="font-mono font-semibold text-sm whitespace-nowrap flex-shrink-0"
-                  style={{ color: isSelected ? 'var(--brand-accent-2, #b8851e)' : 'var(--text-faint, #9ca3af)' }}
-                >
-                  {isSelected
-                    ? `$${lineCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                    : '—'
-                  }
+                <div className="text-right flex-shrink-0">
+                  {isSelected ? (
+                    <>
+                      {hasMarkup ? (
+                        <>
+                          <div className="font-mono font-semibold text-sm line-through text-gray-400">
+                            ${lineCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                          <div className="font-mono font-bold text-sm" style={{ color: 'var(--brand-accent-2, #b8851e)' }}>
+                            ${billed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="font-mono font-semibold text-sm" style={{ color: 'var(--brand-accent-2, #b8851e)' }}>
+                          ${lineCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="font-mono font-semibold text-sm text-gray-300">—</div>
+                  )}
                 </div>
               </div>
 
@@ -198,9 +230,10 @@ export default function CampaignBuilderSection(props: Props) {
                 <div className="text-[10px] text-gray-400 mt-0.5 italic">Default {item.unitNote}</div>
               </div>
 
-              {/* Row 3: price + qty inputs (indented), only shown for selectable rows */}
+              {/* Row 3: price + qty + markup inputs (indented), only for selectable rows */}
               {!isFree && (
                 <div className="pl-7 mt-2 flex flex-wrap items-center gap-3">
+                  {/* Unit price */}
                   <div className="flex items-center gap-1">
                     <span className="text-[11px] text-gray-500">$</span>
                     <input
@@ -225,6 +258,7 @@ export default function CampaignBuilderSection(props: Props) {
                     )}
                   </div>
 
+                  {/* Qty */}
                   {showQty && (
                     <div className="flex items-center gap-1">
                       <span className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Qty</span>
@@ -240,6 +274,25 @@ export default function CampaignBuilderSection(props: Props) {
                       <span className="text-[10px] text-gray-500">{item.unitLabel}</span>
                     </div>
                   )}
+
+                  {/* Markup % */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">Markup</span>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        placeholder="0"
+                        value={pick?.markup_percentage ?? ''}
+                        disabled={!isSelected}
+                        onChange={e => updateMarkup(item.id, parseFloat(e.target.value) || undefined)}
+                        className="w-14 text-right font-mono px-2 py-1 pr-5 border border-amber-300 rounded text-xs focus:border-amber-500 focus:outline-none disabled:opacity-30 disabled:cursor-not-allowed bg-amber-50"
+                      />
+                      <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-gray-400">%</span>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

@@ -45,6 +45,8 @@ export interface CampaignPick {
   qty: number
   /** Only present when the user overrode the default unit price. */
   unitPrice?: number
+  /** Optional markup percentage applied on top of cost (e.g. 20 = 20%). */
+  markup_percentage?: number
 }
 
 /**
@@ -159,4 +161,19 @@ export function isPriceOverridden(item: CampaignItem, unitPrice: number | undefi
 /** True if this item type needs a qty input rendered. */
 export function needsQty(item: CampaignItem): boolean {
   return item.pricing === 'per_unit' || item.pricing === 'monthly'
+}
+
+/**
+ * Billed amount for a pick after applying markup.
+ * Returns the raw cost when no markup is set.
+ */
+export function campaignItemBilled(
+  item: CampaignItem | undefined,
+  qty: number,
+  unitPrice?: number,
+  markup_percentage?: number
+): number {
+  const cost = campaignItemCost(item, qty, unitPrice)
+  if (!markup_percentage || markup_percentage <= 0) return cost
+  return cost * (1 + markup_percentage / 100)
 }

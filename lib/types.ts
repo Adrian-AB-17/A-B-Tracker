@@ -33,6 +33,7 @@ export interface WorkOrder {
   est_cost?: number
   add_cost?: number
   ad_spend?: number
+  markup_percentage?: number | null
   due_date?: string
   submitted_at?: string
   stage_entered_at?: string | null

@@ -76,9 +76,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   printProducts?: PrintProduct[];
   printProductTiers?: PrintProductTier[];
 }) {
-  // Resolved price for the new-WO form. Used to auto-fill est_cost when both
-  // client and service are selected, and to show a Custom / Base rate badge.
-  // Returns null if either id is missing or the service isn't found.
   const rates = clientRates || []
   function resolveNewWoPrice(clientId: string | undefined, serviceId: string | undefined) {
     if (!clientId || !serviceId) return null
@@ -98,13 +95,8 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [filterService, setFilterService] = useState('')
   const [filterOwner, setFilterOwner] = useState('')
   const [selectedWo, setSelectedWo] = useState<WoOrNew | null>(null)
-
-  // Line items subtotal for the currently-open WO panel. Updated by
-  // WoLineItemsSection via its onTotalChange callback. Falls back to the
-  // server-loaded aggregate when the panel hasn't loaded items yet.
   const [openWoLineItemTotal, setOpenWoLineItemTotal] = useState<number | null>(null)
 
-  // ----- URL-driven sidebar filters -----
   const urlAssignedToMe       = searchParams.get('assignedToMe') === '1'
   const urlOwnedByMe          = searchParams.get('ownedByMe') === '1'
   const urlFlagged            = searchParams.get('flagged') === '1'
@@ -118,9 +110,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const hasUrlFilters = urlAssignedToMe || urlOwnedByMe || urlFlagged || urlStale ||
     urlOverdue || urlActiveOnly || urlOverdueOrFlagged || !!urlClient || !!urlStage
 
-  function clearUrlFilters() {
-    router.push(pathname)
-  }
+  function clearUrlFilters() { router.push(pathname) }
 
   function activeFilterSummary(): string {
     const parts: string[] = []
@@ -149,6 +139,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
+
   const [saving, setSaving] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
@@ -163,12 +154,8 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   const [togglingAssignee, setTogglingAssignee] = useState<string | null>(null)
   const supabase = createClient()
 
-  // Reset line item total state when WO panel switches
-  useEffect(() => {
-    setOpenWoLineItemTotal(null)
-  }, [selectedWo])
+  useEffect(() => { setOpenWoLineItemTotal(null) }, [selectedWo])
 
-  // Auto-open WO from ?wo=X param
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
@@ -185,24 +172,19 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workOrders.length])
 
-
   useEffect(() => {
     if (!selectedWo || (selectedWo as any).__new) { setStageHistory([]); return }
     const wo = selectedWo as WorkOrder
     supabase.from('wo_stage_history')
-      .select('*')
-      .eq('work_order_id', wo.id)
-      .order('changed_at', { ascending: false })
-      .limit(20)
+      .select('*').eq('work_order_id', wo.id)
+      .order('changed_at', { ascending: false }).limit(20)
       .then(({ data }) => setStageHistory(data || []))
   }, [selectedWo, supabase])
 
   useEffect(() => {
     if (!selectedWo || (selectedWo as any).__new) { setComments([]); return }
     const wo = selectedWo as WorkOrder
-    supabase.from('wo_comments')
-      .select('*')
-      .eq('work_order_id', wo.id)
+    supabase.from('wo_comments').select('*').eq('work_order_id', wo.id)
       .order('created_at', { ascending: true })
       .then(({ data }) => setComments(data || []))
   }, [selectedWo, supabase])
@@ -210,9 +192,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   useEffect(() => {
     if (!selectedWo || (selectedWo as any).__new) { setTasks([]); return }
     const wo = selectedWo as WorkOrder
-    supabase.from('wo_tasks')
-      .select('*')
-      .eq('work_order_id', wo.id)
+    supabase.from('wo_tasks').select('*').eq('work_order_id', wo.id)
       .order('sort_order', { ascending: true })
       .then(({ data }) => setTasks((data || []) as Task[]))
   }, [selectedWo, supabase])
@@ -220,9 +200,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   useEffect(() => {
     if (!selectedWo || (selectedWo as any).__new) { setAssignees([]); return }
     const wo = selectedWo as WorkOrder
-    supabase.from('wo_assignees')
-      .select('team_member_id')
-      .eq('work_order_id', wo.id)
+    supabase.from('wo_assignees').select('team_member_id').eq('work_order_id', wo.id)
       .then(({ data }) => setAssignees((data || []).map((r: any) => r.team_member_id)))
   }, [selectedWo, supabase])
 
@@ -234,9 +212,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     if (isAssigned) {
       setAssignees(prev => prev.filter(id => id !== teamMemberId))
       const { error } = await supabase.from('wo_assignees')
-        .delete()
-        .eq('work_order_id', wo.id)
-        .eq('team_member_id', teamMemberId)
+        .delete().eq('work_order_id', wo.id).eq('team_member_id', teamMemberId)
       if (error) {
         alert('Failed to remove: ' + error.message)
         setAssignees(prev => [...prev, teamMemberId])
@@ -249,7 +225,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
         alert('Failed to assign: ' + error.message)
         setAssignees(prev => prev.filter(id => id !== teamMemberId))
       } else {
-        // Notify the newly assigned team member (skip self-assignment)
         const member = team.find(t => t.id === teamMemberId)
         if (member?.auth_user_id && member.auth_user_id !== currentMember?.auth_user_id) {
           fetch('/api/notify', {
@@ -257,8 +232,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               notifications: [{ user_id: member.auth_user_id, type: 'assignment' }],
-              wo_title: wo.title,
-              wo_id: wo.id,
+              wo_title: wo.title, wo_id: wo.id,
             }),
           }).catch(e => console.error('Notify fetch error:', e))
         }
@@ -275,7 +249,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       if (filterClient && wo.client_id !== filterClient) return false
       if (filterService && wo.service_id !== filterService) return false
       if (filterOwner && wo.owner_id !== filterOwner) return false
-
       if (urlAssignedToMe) {
         if (!currentMember?.id) return false
         const woAssignees = assignmentsByWo?.[wo.id] || []
@@ -284,26 +257,16 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       if (urlOwnedByMe) {
         if (!currentMember?.id || wo.owner_id !== currentMember.id) return false
       }
-      if (urlFlagged) {
-        if ((wo as any).flagged !== true) return false
-      }
-      if (urlStale) {
-        if (!isStale(wo)) return false
-      }
-      if (urlOverdue) {
-        if (!isOverdue(wo)) return false
-      }
-      if (urlActiveOnly) {
-        if (!activeDeliverySet.has(wo.stage)) return false
-      }
+      if (urlFlagged) { if ((wo as any).flagged !== true) return false }
+      if (urlStale) { if (!isStale(wo)) return false }
+      if (urlOverdue) { if (!isOverdue(wo)) return false }
+      if (urlActiveOnly) { if (!activeDeliverySet.has(wo.stage)) return false }
       if (urlOverdueOrFlagged) {
         const flagged = (wo as any).flagged === true
         const overdue = isOverdue(wo)
         if (!flagged && !overdue) return false
       }
-      if (urlClient) {
-        if (wo.client_id !== urlClient) return false
-      }
+      if (urlClient) { if (wo.client_id !== urlClient) return false }
       if (urlStage) {
         if (urlStage === 'approved-or-executed') {
           if (wo.stage !== 'approved' && wo.stage !== 'deliverables-executed') return false
@@ -324,10 +287,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     const prevState = workOrders
     setWorkOrders(prev => prev.map(w => w.id === woId ? { ...w, stage: newStage } : w))
     const { data, error } = await supabase.from('work_orders').update({ stage: newStage }).eq('id', woId).select()
-    if (error) {
-      alert('Move failed: ' + error.message)
-      setWorkOrders(prevState)
-    }
+    if (error) { alert('Move failed: ' + error.message); setWorkOrders(prevState) }
   }
 
   async function updateWo(patch: Partial<WorkOrder>) {
@@ -346,7 +306,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
         .select('*').eq('work_order_id', wo.id)
         .order('changed_at', { ascending: false }).limit(20)
       setStageHistory(data || [])
-      // Stage-change notifications
       const ownerMember = team.find((t: any) => t.id === wo.owner_id)
       const assigneeMemberIds = assignees
       const assigneeAuthIds = assigneeMemberIds
@@ -354,9 +313,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
         .filter(Boolean) as string[]
       notifyStageChange({
         stage: patch.stage as string,
-        woId: wo.id,
-        woTitle: wo.title,
-        clientId: wo.client_id,
+        woId: wo.id, woTitle: wo.title, clientId: wo.client_id,
         ownerAuthId: ownerMember?.auth_user_id || null,
         assigneeAuthIds,
         senderName: ownerMember?.name || undefined,
@@ -386,11 +343,11 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
   }
 
   const [newWo, setNewWo] = useState<Partial<WorkOrder>>({})
-  // Campaign builder state — only used when service is Storm Response or Marketing Campaign
   const [campaignPicks, setCampaignPicks] = useState<CampaignPick[]>([])
   const [newWoSchedule, setNewWoSchedule] = useState<ScheduleRow[]>([])
   const [campaignTitle, setCampaignTitle] = useState('')
   const [campaignDuration, setCampaignDuration] = useState<{ value: string; unit: 'days' | 'weeks' | 'months' }>({ value: '', unit: 'weeks' })
+
   function openNewWo() {
     setNewWo({ title: '', stage: 'not-started', priority: 'medium',
       occurrence: 'One-time',
@@ -398,13 +355,13 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       owner_id: '', est_cost: 0, add_cost: 0, ad_spend: 0 })
     setSelectedWo({ __new: true } as any)
   }
+
   async function createWo() {
     if (!newWo.title?.trim()) { alert('Please enter a title.'); return }
     if (!newWo.client_id) { alert('Please select a client.'); return }
     if (!newWo.service_id) { alert('Please select a service.'); return }
     setSaving(true)
 
-    // Build notes — prefix with campaign meta if this is a campaign WO and the user filled them in
     let notesValue = newWo.notes || null
     if (isCampaignService(newWo.service_id)) {
       const metaParts: string[] = []
@@ -425,6 +382,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       priority: newWo.priority || 'medium', occurrence: newWo.occurrence || 'One-time',
       est_cost: newWo.est_cost || 0,
       add_cost: newWo.add_cost || 0, ad_spend: newWo.ad_spend || 0,
+      markup_percentage: (newWo as any).markup_percentage || null,
       due_date: newWo.due_date || null,
       branch: newWo.branch || null, vendor: newWo.vendor || null,
       deliverables_link: newWo.deliverables_link || null,
@@ -436,7 +394,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       .single()
     if (error) { setSaving(false); alert('Error creating: ' + error.message); return }
 
-    // If this was a campaign WO with picks, flatten them to wo_line_items
     const woRow = data as WorkOrder
     if (isCampaignService(woRow.service_id) && campaignPicks.length > 0) {
       const lineItemRows = campaignPicks
@@ -444,7 +401,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
           const item = CAMPAIGN_ITEMS.find(i => i.id === pick.id)
           if (!item) return null
           const unitPrice = typeof pick.unitPrice === 'number' ? pick.unitPrice : item.price
-          // For flat / no_charge, qty stays 1 so total = unit_price
           const qty = (item.pricing === 'per_unit' || item.pricing === 'monthly') ? pick.qty : 1
           const sortOrder = CAMPAIGN_ITEMS.findIndex(i => i.id === pick.id)
           return {
@@ -452,6 +408,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
             description: item.name,
             qty,
             unit_price: unitPrice,
+            markup_percentage: pick.markup_percentage || null,
             sort_order: sortOrder,
             source: 'campaign',
             campaign_item_id: item.id,
@@ -461,36 +418,25 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
 
       if (lineItemRows.length > 0) {
         const { error: liError } = await supabase.from('wo_line_items').insert(lineItemRows)
-        if (liError) {
-          // WO is saved; just warn that line items partially failed
-          alert(`WO created, but campaign items failed to save: ${liError.message}`)
-        }
+        if (liError) alert(`WO created, but campaign items failed to save: ${liError.message}`)
       }
     }
 
-    // Flush buffered schedule rows (from drawer Execution Schedule on new WO)
     if (newWoSchedule.length > 0) {
       const scheduleRows = newWoSchedule.map(s => ({
         work_order_id: woRow.id,
-        scheduled_date: s.scheduled_date,
-        scheduled_time: s.scheduled_time,
-        type: s.type,
-        title: s.title,
-        owner_id: s.owner_id,
-        status: s.status,
-        sort_order: s.sort_order,
+        scheduled_date: s.scheduled_date, scheduled_time: s.scheduled_time,
+        type: s.type, title: s.title, owner_id: s.owner_id,
+        status: s.status, sort_order: s.sort_order,
       }))
       const { error: schedError } = await supabase.from('wo_schedule').insert(scheduleRows)
-      if (schedError) {
-        alert(`WO created, but schedule rows failed to save: ${schedError.message}`)
-      }
+      if (schedError) alert(`WO created, but schedule rows failed to save: ${schedError.message}`)
     }
 
     setSaving(false)
     setWorkOrders(prev => [woRow, ...prev])
     setSelectedWo(null)
     setNewWo({})
-    // Reset campaign builder state so the next New WO opens fresh
     setCampaignPicks([])
     setCampaignTitle('')
     setCampaignDuration({ value: '', unit: 'weeks' })
@@ -520,26 +466,19 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     const out: Record<string, WorkOrder[]> = {}
     BOARD_STAGES.forEach(s => out[s] = [])
     filtered.forEach(wo => { if (out[wo.stage]) out[wo.stage].push(wo) })
-    // Newest first within each column.
     BOARD_STAGES.forEach(s => {
       out[s].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     })
     return out
   }, [filtered])
 
-  // Helper: total cost for a single card/WO, including server-loaded line items.
   function cardCost(w: WorkOrder): number {
-    return (w.est_cost || 0)
-      + (w.add_cost || 0)
-      + ((w as any).ad_spend || 0)
-      + (lineItemTotalsByWo?.[w.id] || 0)
+    return (w.est_cost || 0) + (w.add_cost || 0) + ((w as any).ad_spend || 0) + (lineItemTotalsByWo?.[w.id] || 0)
   }
 
   const columnTotals = useMemo(() => {
     const out: Record<string, number> = {}
-    BOARD_STAGES.forEach(s => {
-      out[s] = (grouped[s] || []).reduce((sum, w) => sum + cardCost(w), 0)
-    })
+    BOARD_STAGES.forEach(s => { out[s] = (grouped[s] || []).reduce((sum, w) => sum + cardCost(w), 0) })
     return out
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grouped, lineItemTotalsByWo])
@@ -569,8 +508,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     return map
   }, [team])
 
-  // Services grouped by billing cadence (Recurring, One-time, etc.) for use
-  // in the New/Edit WO modal service dropdown. Recurring comes first.
   const servicesByOccurrence = useMemo(() => {
     const order = ['Recurring', 'One-time', 'Quarterly', 'Weekly', 'Other']
     const groups: Record<string, any[]> = {}
@@ -580,13 +517,10 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
       groups[key].push(s)
     })
     Object.values(groups).forEach(list => list.sort((a, b) => a.name.localeCompare(b.name)))
-    // Sort by predefined order, falling back to alphabetical for unknown keys
     const sortedEntries = Object.entries(groups).sort((a, b) => {
-      const ai = order.indexOf(a[0])
-      const bi = order.indexOf(b[0])
+      const ai = order.indexOf(a[0]); const bi = order.indexOf(b[0])
       if (ai !== -1 && bi !== -1) return ai - bi
-      if (ai !== -1) return -1
-      if (bi !== -1) return 1
+      if (ai !== -1) return -1; if (bi !== -1) return 1
       return a[0].localeCompare(b[0])
     })
     return Object.fromEntries(sortedEntries)
@@ -625,11 +559,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
         className={`bg-white rounded-lg px-3 py-2.5 cursor-grab active:cursor-grabbing transition-all hover:shadow-[0_2px_8px_rgba(15,27,52,0.08)] ${
           draggedId === card.id ? 'opacity-30' : ''
         }`}
-        style={{
-          border: '1px solid var(--border)',
-          borderLeftWidth: '3px',
-          borderLeftColor: flagged ? 'var(--red)' : priorityColor,
-        }}>
+        style={{ border: '1px solid var(--border)', borderLeftWidth: '3px', borderLeftColor: flagged ? 'var(--red)' : priorityColor }}>
 
         <div className="flex items-center justify-between gap-2 mb-1">
           <span className="font-mono text-[10px] tracking-wider" style={{ color: 'var(--text-faint)' }}>
@@ -679,14 +609,10 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
             : hasOverdue
               ? { background: 'var(--red-soft)', color: 'var(--red)', borderColor: '#fecaca' }
               : { background: 'var(--bg-sunken)', color: 'var(--text-muted)', borderColor: 'var(--border)' }
-          const tooltipLabel = hasOverdue
-            ? `${agg.overdue} overdue · ${agg.done}/${agg.total} done`
-            : `${agg.done}/${agg.total} done`
+          const tooltipLabel = hasOverdue ? `${agg.overdue} overdue · ${agg.done}/${agg.total} done` : `${agg.done}/${agg.total} done`
           return (
             <div className="mt-2">
-              <span className="inline-block text-[10px] px-1.5 py-0.5 rounded font-semibold border"
-                style={colorStyle}
-                title={tooltipLabel}>
+              <span className="inline-block text-[10px] px-1.5 py-0.5 rounded font-semibold border" style={colorStyle} title={tooltipLabel}>
                 ✓ {agg.done}/{agg.total} tasks
               </span>
             </div>
@@ -729,14 +655,13 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
               <div className="flex items-center gap-1.5 min-w-0">
                 <div className="flex">
                   {ordered.slice(0, 4).map((m, idx) => (
-                    <div key={m.id}
-                      title={m.isOwner ? `${m.name} (owner)` : m.name}
+                    <div key={m.id} title={m.isOwner ? `${m.name} (owner)` : m.name}
                       className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-semibold flex-shrink-0"
                       style={{
                         background: m.isOwner ? 'var(--brand-accent)' : 'var(--brand-navy)',
-                        color:      m.isOwner ? 'var(--brand-navy)'   : 'white',
+                        color: m.isOwner ? 'var(--brand-navy)' : 'white',
                         marginLeft: idx === 0 ? 0 : '-6px',
-                        border:     idx === 0 ? 'none' : '1.5px solid var(--bg-elevated)',
+                        border: idx === 0 ? 'none' : '1.5px solid var(--bg-elevated)',
                         letterSpacing: '0.02em',
                       }}>
                       {m.name[0]?.toUpperCase()}
@@ -764,9 +689,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     )
   }
 
-  // Compute the live line-item subtotal for the open WO. While the panel is
-  // open and the section has reported its current sum via onTotalChange, use
-  // that. Otherwise fall back to the server aggregate.
   const openWoLineItemSubtotal = useMemo(() => {
     if (!selectedWo || (selectedWo as any).__new) return 0
     if (openWoLineItemTotal != null) return openWoLineItemTotal
@@ -776,7 +698,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
 
   return (
     <div className="flex flex-col" style={{ background: 'var(--bg)' }}>
-      {/* Active filter banner */}
       {hasUrlFilters && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 md:px-6 py-2 flex items-center justify-between gap-3">
           <div className="text-xs md:text-sm text-amber-900 truncate">
@@ -784,10 +705,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
             <span className="text-amber-700">{activeFilterSummary()}</span>{' '}
             <span className="font-mono text-amber-600">· {filtered.length} of {workOrders.length}</span>
           </div>
-          <button
-            onClick={clearUrlFilters}
-            className="text-xs md:text-sm text-amber-800 hover:text-amber-900 underline font-medium flex-shrink-0"
-          >
+          <button onClick={clearUrlFilters} className="text-xs md:text-sm text-amber-800 hover:text-amber-900 underline font-medium flex-shrink-0">
             Clear filter
           </button>
         </div>
@@ -820,8 +738,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
           </button>
         </div>
         <div className={`${filtersOpen ? 'block' : 'hidden md:flex'} md:flex flex-wrap gap-2`}>
-          <input type="text" placeholder="🔍 Search..."
-            value={search} onChange={e => setSearch(e.target.value)}
+          <input type="text" placeholder="🔍 Search..." value={search} onChange={e => setSearch(e.target.value)}
             className="flex-1 min-w-[140px] px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white">
@@ -888,9 +805,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-red-600">⚠️</span>
-                  <span className="text-xs font-bold text-red-700 uppercase tracking-wide">
-                    Overdue ({dueAlerts.overdue.length})
-                  </span>
+                  <span className="text-xs font-bold text-red-700 uppercase tracking-wide">Overdue ({dueAlerts.overdue.length})</span>
                 </div>
               </div>
               <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -916,9 +831,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span>📅</span>
-                  <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">
-                    Due Today ({dueAlerts.dueToday.length})
-                  </span>
+                  <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">Due Today ({dueAlerts.dueToday.length})</span>
                 </div>
               </div>
               <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -972,7 +885,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
         </div>
       )}
 
-      {/* Desktop */}
+      {/* Desktop board */}
       <div className="hidden md:block overflow-x-auto px-6 py-4">
         <div className="flex gap-3 min-w-max">
           {BOARD_STAGES.map(stageId => {
@@ -986,13 +899,14 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                 onDrop={(e) => handleDrop(e, stageId)}
                 onDragLeave={() => setDragOverStage(null)}>
                 <div className="sticky top-0 z-10 bg-white rounded-t-lg border border-b-0 px-3 py-2.5"
-                     style={{ borderColor: 'var(--border)', borderTopColor: stage.color, borderTopWidth: 3 }}>
+                  style={{ borderColor: 'var(--border)', borderTopColor: stage.color, borderTopWidth: 3 }}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-sm" style={{ background: stage.color }} />
                       <span className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: 'var(--brand-navy)' }}>{stage.label}</span>
                     </div>
-                    <span className="text-[11px] font-mono tabular-nums px-1.5 py-0.5 rounded-full" style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}>{cards.length}</span>
+                    <span className="text-[11px] font-mono tabular-nums px-1.5 py-0.5 rounded-full"
+                      style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-faint)' }}>{cards.length}</span>
                   </div>
                   {showCosts && total > 0 && (
                     <div className="text-[11px] mt-1 font-mono tabular-nums" style={{ color: 'var(--text-muted)' }}>${total.toLocaleString()}</div>
@@ -1005,9 +919,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                   {cards.length === 0 && !isDragOver && (
                     <div className="text-xs text-gray-300 text-center py-6">No work orders</div>
                   )}
-                  {isDragOver && (
-                    <div className="text-xs text-blue-500 text-center py-2 font-medium">Drop here</div>
-                  )}
+                  {isDragOver && <div className="text-xs text-blue-500 text-center py-2 font-medium">Drop here</div>}
                   {cards.map(renderCard)}
                 </div>
               </div>
@@ -1040,7 +952,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                 {!isNew && wo?.id && (
                   <button
                     onClick={() => {
-                      // Encode current board URL (filters + open WO) so Back to Board restores state
                       const params = new URLSearchParams(searchParams.toString())
                       params.set('wo', wo.id)
                       const from = encodeURIComponent(pathname + '?' + params.toString())
@@ -1100,8 +1011,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                         onChange={e => {
                           const newClientId = e.target.value
                           const patch: any = { client_id: newClientId }
-                          // Re-resolve est_cost when client changes (only if a service is already picked).
-                          // Skip campaign services — est_cost is driven by item picker, must stay 0.
                           if (newClientId && newWo.service_id && !isCampaignService(newWo.service_id)) {
                             const resolved = resolveNewWoPrice(newClientId, newWo.service_id)
                             if (resolved) patch.est_cost = resolved.price
@@ -1133,15 +1042,12 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                             target.setDate(target.getDate() + picked.lead_time_days)
                             patch.due_date = target.toISOString().substring(0, 10)
                           }
-                          // Campaign services: force est_cost to 0; item picker drives Total
                           if (isCampaignService(newServiceId)) {
                             patch.est_cost = 0
                             setCampaignPicks([])
                             setCampaignTitle('')
                             setCampaignDuration({ value: '', unit: 'weeks' })
-                          }
-                          // Auto-fill est_cost from priceFor (override if exists, else base)
-                          else if (newServiceId && newWo.client_id) {
+                          } else if (newServiceId && newWo.client_id) {
                             const resolved = resolveNewWoPrice(newWo.client_id, newServiceId)
                             if (resolved) patch.est_cost = resolved.price
                           } else if (picked?.base_price != null) {
@@ -1180,11 +1086,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                       const sid = isNew ? newWo.service_id : wo?.service_id
                       const picked = services.find((s: any) => s.id === sid)
                       if (!picked?.description) return null
-                      return (
-                        <div className="mt-1 text-[11px] leading-snug" style={{ color: 'var(--text-muted)' }}>
-                          {picked.description}
-                        </div>
-                      )
+                      return <div className="mt-1 text-[11px] leading-snug" style={{ color: 'var(--text-muted)' }}>{picked.description}</div>
                     })()}
                   </div>
                   <div>
@@ -1232,41 +1134,27 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
 
                 {isNew ? (
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">
-                      Assigned To
-                    </label>
-                    <div className="text-xs text-gray-400 italic px-1">
-                      Save the work order first, then assign team members.
-                    </div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Assigned To</label>
+                    <div className="text-xs text-gray-400 italic px-1">Save the work order first, then assign team members.</div>
                   </div>
                 ) : (
                   <div>
                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">
-                      Assigned To {assignees.length > 0 && (
-                        <span className="ml-1 normal-case text-gray-400 font-normal">({assignees.length})</span>
-                      )}
+                      Assigned To {assignees.length > 0 && <span className="ml-1 normal-case text-gray-400 font-normal">({assignees.length})</span>}
                     </label>
                     <div className="flex flex-wrap gap-1.5">
                       {team.map((t: any) => {
                         const assigned = assignees.includes(t.id)
                         const busy = togglingAssignee === t.id
                         return (
-                          <button
-                            key={t.id}
-                            onClick={() => toggleAssignee(t.id)}
-                            disabled={busy}
-                            className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border transition-all ${
-                              busy ? 'opacity-50' : ''
-                            } ${
-                              assigned
-                                ? 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100'
-                                : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                          <button key={t.id} onClick={() => toggleAssignee(t.id)} disabled={busy}
+                            className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border transition-all ${busy ? 'opacity-50' : ''} ${
+                              assigned ? 'bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100'
+                                       : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
                             }`}
-                            title={assigned ? `Remove ${t.name}` : `Assign ${t.name}`}
-                          >
-                            <span className={`inline-flex w-4 h-4 rounded-full items-center justify-center text-[10px] font-bold text-white ${
-                              assigned ? '' : 'opacity-40'
-                            }`} style={{ background: '#2d4a7c' }}>
+                            title={assigned ? `Remove ${t.name}` : `Assign ${t.name}`}>
+                            <span className={`inline-flex w-4 h-4 rounded-full items-center justify-center text-[10px] font-bold text-white ${assigned ? '' : 'opacity-40'}`}
+                              style={{ background: '#2d4a7c' }}>
                               {t.name[0]}
                             </span>
                             <span className="font-medium">{t.name}</span>
@@ -1274,9 +1162,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                           </button>
                         )
                       })}
-                      {team.length === 0 && (
-                        <span className="text-xs text-gray-400 italic">No team members to assign.</span>
-                      )}
+                      {team.length === 0 && <span className="text-xs text-gray-400 italic">No team members to assign.</span>}
                     </div>
                   </div>
                 )}
@@ -1385,15 +1271,10 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
               {showCosts && (
               <div className="space-y-3">
                 <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Costs</div>
-                {/* Costs card — amber/cream background, stacked rows, total inside */}
-                <div
-                  className="rounded-lg border p-4 space-y-3"
-                  style={{
-                    background: 'var(--brand-accent-soft, #fdf6e8)',
-                    borderColor: 'var(--brand-accent, #d99e2b)',
-                  }}
-                >
-                  {/* Estimated Cost (auto) */}
+                <div className="rounded-lg border p-4 space-y-3"
+                  style={{ background: 'var(--brand-accent-soft, #fdf6e8)', borderColor: 'var(--brand-accent, #d99e2b)' }}>
+
+                  {/* Estimated Cost */}
                   <div className="grid grid-cols-12 gap-3 items-center">
                     <label className="col-span-7 text-xs font-semibold text-gray-600 uppercase tracking-wide">
                       Estimated Cost <span className="text-gray-400 normal-case">(auto)</span>
@@ -1414,9 +1295,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
 
                   {/* Additional Cost */}
                   <div className="grid grid-cols-12 gap-3 items-center">
-                    <label className="col-span-7 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                      Additional Cost
-                    </label>
+                    <label className="col-span-7 text-xs font-semibold text-gray-600 uppercase tracking-wide">Additional Cost</label>
                     <div className="col-span-5 relative">
                       <span className="absolute left-2 top-2 text-sm text-gray-400">$</span>
                       {isNew ? (
@@ -1433,9 +1312,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
 
                   {/* Ad Spend */}
                   <div className="grid grid-cols-12 gap-3 items-center">
-                    <label className="col-span-7 text-xs font-semibold text-gray-600 uppercase tracking-wide">
-                      Ad Spend
-                    </label>
+                    <label className="col-span-7 text-xs font-semibold text-gray-600 uppercase tracking-wide">Ad Spend</label>
                     <div className="col-span-5 relative">
                       <span className="absolute left-2 top-2 text-sm text-gray-400">$</span>
                       {isNew ? (
@@ -1449,6 +1326,37 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                       )}
                     </div>
                   </div>
+
+                  {/* ── Markup % — always visible, applies to ad spend ── */}
+                  <div className="grid grid-cols-12 gap-3 items-center">
+                    <label className="col-span-7 text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                      Markup % <span className="text-gray-400 normal-case font-normal">(on ad spend)</span>
+                    </label>
+                    <div className="col-span-5 relative">
+                      <input type="number" placeholder="0" min={0} max={100} step={1}
+                        value={isNew ? ((newWo as any).markup_percentage ?? '') : ((wo as any)?.markup_percentage ?? '')}
+                        onChange={e => isNew && setNewWo({ ...newWo, markup_percentage: parseFloat(e.target.value) || null } as any)}
+                        onBlur={e => !isNew && updateWo({ markup_percentage: parseFloat(e.target.value) || null } as any)}
+                        className="w-full text-sm pl-3 pr-7 py-2 border border-gray-300 rounded font-mono text-right bg-white focus:border-blue-500 focus:outline-none" />
+                      <span className="absolute right-2 top-2 text-sm text-gray-400">%</span>
+                    </div>
+                  </div>
+
+                  {/* Billed to client preview — shows when ad spend + markup both set */}
+                  {(() => {
+                    const spend = (isNew ? (newWo as any).ad_spend : (wo as any)?.ad_spend) || 0
+                    const markup = (isNew ? (newWo as any).markup_percentage : (wo as any)?.markup_percentage) || 0
+                    if (!spend || !markup) return null
+                    const billed = spend * (1 + markup / 100)
+                    return (
+                      <div className="flex items-center justify-between text-xs px-1 py-1 rounded bg-amber-100">
+                        <span className="text-amber-700 font-semibold">Billed to client (ad spend):</span>
+                        <span className="font-bold font-mono" style={{ color: 'var(--brand-accent-2, #b8851e)' }}>
+                          ${billed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )
+                  })()}
 
                   {/* Divider + Total */}
                   <div className="pt-2" style={{ borderTop: '1px dashed rgba(217, 158, 43, 0.4)' }}>
@@ -1481,9 +1389,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                       : `${(picked.occurrence || 'one-time').toLowerCase()} service`
                     const rateLabel = isManual
                       ? `manually edited (auto was $${resolved.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-                      : resolved.isOverride
-                        ? '★ custom rate — auto-filled'
-                        : 'A&B standard rate — auto-filled'
+                      : resolved.isOverride ? '★ custom rate — auto-filled' : 'A&B standard rate — auto-filled'
                     return (
                       <div className="pt-2 text-[11px] text-gray-600" style={{ borderTop: '1px dashed rgba(217, 158, 43, 0.4)' }}>
                         <span className="font-semibold">{picked.name}</span>
@@ -1493,7 +1399,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                   })()}
                 </div>
 
-                {/* Campaign builder — only on New WO with a campaign service picked (v1) */}
+                {/* Campaign builder */}
                 {isNew && newWo.service_id && isCampaignService(newWo.service_id) && (
                   <div className="pt-2">
                     <CampaignBuilderSection
@@ -1508,7 +1414,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                   </div>
                 )}
 
-                {/* Line items — existing WOs only. Lives BELOW the costs card. */}
+                {/* Line items */}
                 {!isNew && wo?.id && (
                   <div className="pt-2">
                     <WoLineItemsSection
@@ -1527,53 +1433,37 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                 <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Details</div>
 
                 <div className={`rounded-lg border ${
-                  (isNew ? (newWo as any).flagged : (wo as any)?.flagged)
-                    ? 'border-red-200 bg-red-50'
-                    : 'border-gray-200 bg-white'
+                  (isNew ? (newWo as any).flagged : (wo as any)?.flagged) ? 'border-red-200 bg-red-50' : 'border-gray-200 bg-white'
                 }`}>
                   <label className="flex items-start gap-2 px-3 py-2.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
+                    <input type="checkbox"
                       className="mt-0.5 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
                       checked={!!(isNew ? (newWo as any).flagged : (wo as any)?.flagged)}
                       onChange={e => {
                         const next = e.target.checked
-                        if (isNew) {
-                          setNewWo({ ...newWo, flagged: next, ...(next ? {} : { issue: null }) } as any)
-                        } else {
-                          updateWo({ flagged: next, ...(next ? {} : { issue: null }) } as any)
-                        }
+                        if (isNew) setNewWo({ ...newWo, flagged: next, ...(next ? {} : { issue: null }) } as any)
+                        else updateWo({ flagged: next, ...(next ? {} : { issue: null }) } as any)
                       }}
                     />
                     <div className="flex-1">
-                      <div className={`text-sm font-semibold ${
-                        (isNew ? (newWo as any).flagged : (wo as any)?.flagged) ? 'text-red-700' : 'text-gray-700'
-                      }`}>
+                      <div className={`text-sm font-semibold ${(isNew ? (newWo as any).flagged : (wo as any)?.flagged) ? 'text-red-700' : 'text-gray-700'}`}>
                         <span className="mr-1">⚑</span> Flag with issue
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        Surface this work order to the team as needing attention
-                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">Surface this work order to the team as needing attention</div>
                     </div>
                   </label>
                   {(isNew ? (newWo as any).flagged : (wo as any)?.flagged) && (
                     <div className="px-3 pb-3 -mt-1">
                       {isNew ? (
-                        <textarea
-                          value={(newWo as any).issue || ''}
+                        <textarea value={(newWo as any).issue || ''}
                           onChange={e => setNewWo({ ...newWo, issue: e.target.value } as any)}
-                          rows={3}
-                          placeholder="Describe the issue — what's broken, blocked, or needs the team's eyes."
-                          className="w-full text-sm text-red-900 placeholder-red-300 px-3 py-2 border border-red-200 rounded bg-red-50/40 resize-none focus:border-red-500 focus:outline-none"
-                        />
+                          rows={3} placeholder="Describe the issue — what's broken, blocked, or needs the team's eyes."
+                          className="w-full text-sm text-red-900 placeholder-red-300 px-3 py-2 border border-red-200 rounded bg-red-50/40 resize-none focus:border-red-500 focus:outline-none" />
                       ) : (
-                        <textarea
-                          defaultValue={(wo as any)?.issue || ''}
+                        <textarea defaultValue={(wo as any)?.issue || ''}
                           onBlur={e => e.target.value !== ((wo as any)?.issue || '') && updateWo({ issue: e.target.value || null } as any)}
-                          rows={3}
-                          placeholder="Describe the issue — what's broken, blocked, or needs the team's eyes."
-                          className="w-full text-sm text-red-900 placeholder-red-300 px-3 py-2 border border-red-200 rounded bg-red-50/40 resize-none focus:border-red-500 focus:outline-none"
-                        />
+                          rows={3} placeholder="Describe the issue — what's broken, blocked, or needs the team's eyes."
+                          className="w-full text-sm text-red-900 placeholder-red-300 px-3 py-2 border border-red-200 rounded bg-red-50/40 resize-none focus:border-red-500 focus:outline-none" />
                       )}
                     </div>
                   )}
@@ -1623,7 +1513,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                 </div>
               </div>
 
-              {/* ─── Execution Schedule section (Surface 2) ─── */}
+              {/* ─── Execution Schedule ─── */}
               <div className="pt-2">
                 <DrawerScheduleSection
                   workOrderId={isNew ? null : (wo?.id ?? null)}
@@ -1633,27 +1523,21 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                 />
               </div>
 
-              {/* ─── Tasks summary card (Step 4) ─── */}
+              {/* Tasks summary */}
               {!isNew && wo?.id && (
-                <button
-                  onClick={() => router.push(`/dashboard/wo/${wo.id}?tab=tasks`)}
-                  className="w-full text-left px-3 py-2.5 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors flex items-center justify-between"
-                >
+                <button onClick={() => router.push(`/dashboard/wo/${wo.id}?tab=tasks`)}
+                  className="w-full text-left px-3 py-2.5 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-700">
-                      ✓ Tasks
-                    </span>
+                    <span className="text-sm font-semibold text-gray-700">✓ Tasks</span>
                     <span className="text-xs text-gray-500">
-                      {tasks.length === 0
-                        ? 'No tasks yet'
-                        : `${tasks.filter(t => t.status === 'done').length}/${tasks.length} done`}
+                      {tasks.length === 0 ? 'No tasks yet' : `${tasks.filter(t => t.status === 'done').length}/${tasks.length} done`}
                     </span>
                   </div>
                   <span className="text-gray-400 text-sm">›</span>
                 </button>
               )}
 
-              {/* Messages summary card (Step 4) */}
+              {/* Messages summary */}
               {!isNew && wo?.id && (() => {
                 const lastComment = comments.length > 0 ? comments[comments.length - 1] : null
                 const lastAuthor = lastComment?.author_id ? authUserMap[lastComment.author_id] : null
@@ -1667,14 +1551,10 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                   else lastAgo = `${Math.floor(mins / 1440)}d ago`
                 }
                 return (
-                  <button
-                    onClick={() => router.push(`/dashboard/wo/${wo.id}?tab=messages`)}
-                    className="w-full text-left px-3 py-2.5 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors flex items-center justify-between"
-                  >
+                  <button onClick={() => router.push(`/dashboard/wo/${wo.id}?tab=messages`)}
+                    className="w-full text-left px-3 py-2.5 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-colors flex items-center justify-between">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-semibold text-gray-700 flex-shrink-0">
-                        💬 Messages
-                      </span>
+                      <span className="text-sm font-semibold text-gray-700 flex-shrink-0">💬 Messages</span>
                       <span className="text-xs text-gray-500 truncate">
                         {comments.length === 0
                           ? 'No messages yet'
@@ -1686,7 +1566,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                 )
               })()}
 
-                      {/* Stage History (existing WO only) */}
+              {/* Stage History */}
               {!isNew && (
                 <div className="border-t border-gray-100 pt-4">
                   <button onClick={() => setHistoryOpen(!historyOpen)}
@@ -1697,7 +1577,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                   {historyOpen && (
                     <div className="mt-3 space-y-2">
                       {stageHistory.length === 0 && (
-                        <div className="text-xs text-gray-400 italic">No stage changes recorded yet. Change the stage above to start tracking.</div>
+                        <div className="text-xs text-gray-400 italic">No stage changes recorded yet.</div>
                       )}
                       {stageHistory.map(entry => {
                         const from = STAGES.find(s => s.id === entry.from_stage)
@@ -1743,7 +1623,6 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
                     {wo?.id && <div>ID: {wo.id.substring(0, 8)}...</div>}
                   </div>
                   <p className="text-xs text-gray-400 italic pt-2">Changes save automatically when you click outside a field.</p>
-
                   <div className="pt-4 border-t border-gray-100 flex gap-2">
                     {wo?.stage !== 'archived' && (
                       <button onClick={archiveWo} disabled={saving}
