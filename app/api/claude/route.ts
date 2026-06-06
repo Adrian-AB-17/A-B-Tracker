@@ -117,6 +117,242 @@ async function buildContext(level: 'owner' | 'admin' | 'team', authUserId: strin
   return context
 }
 
+// ── Tool definitions ─────────────────────────────────────────────────────────
+const TOOLS = [
+  {
+    name: 'create_wo',
+    description: 'Create a new work order in the tracker',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Work order title' },
+        client_id: { type: 'string', description: 'Client ID (slug format e.g. apollo-supply)' },
+        service_name: { type: 'string', description: 'Service name e.g. Design, Video Production' },
+        due_date: { type: 'string', description: 'Due date in YYYY-MM-DD format' },
+        owner_name: { type: 'string', description: 'Name of the team member to assign as owner' },
+        priority: { type: 'string', enum: ['low', 'medium', 'high', 'urgent'], description: 'Priority level' },
+        notes: { type: 'string', description: 'Internal notes for the work order' },
+      },
+      required: ['title', 'client_id'],
+    },
+  },
+  {
+    name: 'update_stage',
+    description: 'Update the stage of an existing work order',
+    input_schema: {
+      type: 'object',
+      properties: {
+        wo_id: { type: 'string', description: 'Work order ID' },
+        wo_title: { type: 'string', description: 'Work order title (used to find it if ID unknown)' },
+        new_stage: { type: 'string', enum: ['not-started','in-progress','deliverables-completed','sent-for-approval','revisions-received','approved','deliverables-executed','invoiced','paid'], description: 'New stage' },
+      },
+      required: ['new_stage'],
+    },
+  },
+  {
+    name: 'assign_wo',
+    description: 'Assign a work order to a team member',
+    input_schema: {
+      type: 'object',
+      properties: {
+        wo_id: { type: 'string', description: 'Work order ID' },
+        wo_title: { type: 'string', description: 'Work order title' },
+        owner_name: { type: 'string', description: 'Name of the team member to assign as owner' },
+      },
+      required: ['owner_name'],
+    },
+  },
+  {
+    name: 'send_message',
+    description: 'Send a message to the team via HQ channel or to a specific person',
+    input_schema: {
+      type: 'object',
+      properties: {
+        channel: { type: 'string', enum: ['general','standup','design','ads','social','email','web'], description: 'HQ channel to post to' },
+        message: { type: 'string', description: 'The message to send' },
+        mention_names: { type: 'array', items: { type: 'string' }, description: 'Names of team members to @mention' },
+        wo_id: { type: 'string', description: 'Optional: post as a WO comment instead of HQ' },
+      },
+      required: ['message'],
+    },
+  },
+  {
+    name: 'notify_client',
+    description: 'Send an email notification to a client',
+    input_schema: {
+      type: 'object',
+      properties: {
+        client_id: { type: 'string', description: 'Client ID' },
+        subject: { type: 'string', description: 'Email subject' },
+        message: { type: 'string', description: 'Email message body' },
+        wo_id: { type: 'string', description: 'Optional: related work order ID' },
+      },
+      required: ['client_id', 'subject', 'message'],
+    },
+  },
+  {
+    name: 'add_schedule_date',
+    description: 'Add a scheduled date/deliverable to a work order',
+    input_schema: {
+      type: 'object',
+      properties: {
+        wo_id: { type: 'string', description: 'Work order ID' },
+        wo_title: { type: 'string', description: 'Work order title' },
+        scheduled_date: { type: 'string', description: 'Date in YYYY-MM-DD format' },
+        type: { type: 'string', enum: ['email','social-post','social-ad','google-ad','meeting','launch','other'], description: 'Type of scheduled item' },
+        title: { type: 'string', description: 'What is going out on this date' },
+      },
+      required: ['scheduled_date', 'type'],
+    },
+  },
+]
+
+// ── Tool execution ────────────────────────────────────────────────────────────
+async function executeTool(name: string, input: any, level: string, authUserId: string): Promise<string> {
+  try {
+    if (name === 'create_wo') {
+      // Find client
+      const { data: client } = await supabaseAdmin.from('clients').select('id').eq('id', input.client_id).maybeSingle()
+      if (!client) return 'Error: Client not found with ID ' + input.client_id
+
+      // Find service
+      let serviceId = null
+      if (input.service_name) {
+        const { data: svc } = await supabaseAdmin.from('services').select('id').ilike('name', '%' + input.service_name + '%').maybeSingle()
+        serviceId = svc?.id || null
+      }
+
+      // Find owner
+      let ownerId = null
+      if (input.owner_name) {
+        const { data: member } = await supabaseAdmin.from('team_members').select('id').ilike('name', '%' + input.owner_name + '%').maybeSingle()
+        ownerId = member?.id || null
+      }
+
+      const woId = 'WO-' + Math.random().toString(36).slice(2, 10)
+      const { error } = await supabaseAdmin.from('work_orders').insert({
+        id: woId,
+        title: input.title,
+        client_id: input.client_id,
+        service_id: serviceId,
+        owner_id: ownerId,
+        due_date: input.due_date || null,
+        priority: input.priority || 'medium',
+        stage: 'not-started',
+        occurrence: 'one-time',
+        notes: input.notes || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      if (error) return 'Error creating WO: ' + error.message
+      return 'Created work order "' + input.title + '" (ID: ' + woId + ') successfully.'
+    }
+
+    if (name === 'update_stage') {
+      let woId = input.wo_id
+      if (!woId && input.wo_title) {
+        const { data: wo } = await supabaseAdmin.from('work_orders').select('id').ilike('title', '%' + input.wo_title + '%').maybeSingle()
+        woId = wo?.id
+      }
+      if (!woId) return 'Error: Could not find work order "' + (input.wo_title || input.wo_id) + '"'
+      const { error } = await supabaseAdmin.from('work_orders').update({ stage: input.new_stage, updated_at: new Date().toISOString() }).eq('id', woId)
+      if (error) return 'Error: ' + error.message
+      return 'Updated work order to stage "' + input.new_stage + '" successfully.'
+    }
+
+    if (name === 'assign_wo') {
+      let woId = input.wo_id
+      if (!woId && input.wo_title) {
+        const { data: wo } = await supabaseAdmin.from('work_orders').select('id').ilike('title', '%' + input.wo_title + '%').maybeSingle()
+        woId = wo?.id
+      }
+      if (!woId) return 'Error: Could not find work order'
+      const { data: member } = await supabaseAdmin.from('team_members').select('id, name').ilike('name', '%' + input.owner_name + '%').maybeSingle()
+      if (!member) return 'Error: Could not find team member "' + input.owner_name + '"'
+      const { error } = await supabaseAdmin.from('work_orders').update({ owner_id: member.id, updated_at: new Date().toISOString() }).eq('id', woId)
+      if (error) return 'Error: ' + error.message
+      return 'Assigned work order to ' + member.name + ' successfully.'
+    }
+
+    if (name === 'send_message') {
+      const channel = input.channel || 'general'
+      // Build body with @mentions
+      let body = input.message
+      const mentionIds: string[] = []
+      if (input.mention_names?.length) {
+        for (const mname of input.mention_names) {
+          const { data: member } = await supabaseAdmin.from('team_members').select('id, name').ilike('name', '%' + mname + '%').maybeSingle()
+          if (member) {
+            mentionIds.push(member.id)
+            if (!body.includes('@' + member.name.split(' ')[0])) {
+              body = '@' + member.name.split(' ')[0] + ' ' + body
+            }
+          }
+        }
+      }
+
+      if (input.wo_id) {
+        // Post as WO comment
+        const { error } = await supabaseAdmin.from('wo_comments').insert({
+          work_order_id: input.wo_id, body, author_id: authUserId,
+          author_type: 'team', internal_only: false,
+          created_at: new Date().toISOString(),
+        })
+        if (error) return 'Error posting comment: ' + error.message
+        return 'Posted comment on work order successfully.'
+      } else {
+        // Post to HQ wall
+        const { error } = await supabaseAdmin.from('wall_posts').insert({
+          channel, body, author_id: authUserId,
+          mentions: mentionIds, created_at: new Date().toISOString(),
+        })
+        if (error) return 'Error posting to HQ: ' + error.message
+        return 'Posted message to #' + channel + ' in HQ successfully.'
+      }
+    }
+
+    if (name === 'notify_client') {
+      const { data: client } = await supabaseAdmin.from('clients').select('name, contact_name, contact_email').eq('id', input.client_id).maybeSingle()
+      if (!client?.contact_email) return 'Error: No contact email for client ' + input.client_id
+      const apiKey = process.env.RESEND_API_KEY
+      if (!apiKey) return 'Error: No RESEND_API_KEY'
+      const html = '<body style="font-family:sans-serif;padding:32px"><div style="max-width:520px;margin:0 auto"><h2>' + input.subject + '</h2><p>' + input.message.replace(/\n/g, '<br>') + '</p><p style="color:#999;font-size:12px">A&B Consulting Group</p></div></body>'
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: 'A&B Tracker <notifications@abconsultingg.com>', to: client.contact_email, subject: input.subject, html }),
+      })
+      if (!res.ok) return 'Error sending email: ' + await res.text()
+      return 'Email sent to ' + (client.contact_name || client.name) + ' at ' + client.contact_email + ' successfully.'
+    }
+
+    if (name === 'add_schedule_date') {
+      let woId = input.wo_id
+      if (!woId && input.wo_title) {
+        const { data: wo } = await supabaseAdmin.from('work_orders').select('id').ilike('title', '%' + input.wo_title + '%').maybeSingle()
+        woId = wo?.id
+      }
+      if (!woId) return 'Error: Could not find work order'
+      const { error } = await supabaseAdmin.from('wo_schedule').insert({
+        work_order_id: woId,
+        scheduled_date: input.scheduled_date,
+        type: input.type,
+        title: input.title || null,
+        status: 'scheduled',
+        sort_order: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      if (error) return 'Error: ' + error.message
+      return 'Added scheduled date ' + input.scheduled_date + ' (' + input.type + ') to work order successfully.'
+    }
+
+    return 'Unknown tool: ' + name
+  } catch (e: any) {
+    return 'Tool error: ' + e.message
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { messages, authUserId, role, memberName } = await req.json()
@@ -127,23 +363,57 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) return NextResponse.json({ ok: false, error: 'No ANTHROPIC_API_KEY' }, { status: 500 })
 
+    // Only owner and admin can use action tools
+    const tools = (level === 'owner' || level === 'admin') ? TOOLS : []
+
+    const body: any = {
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages,
+    }
+    if (tools.length > 0) body.tools = tools
+
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages,
-      }),
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify(body),
     })
 
     const data = await res.json()
-    const text = data.content?.[0]?.text || 'Sorry, I could not generate a response.'
+
+    // Handle tool use
+    if (data.stop_reason === 'tool_use') {
+      const toolUseBlocks = data.content.filter((b: any) => b.type === 'tool_use')
+      const toolResults: any[] = []
+
+      for (const block of toolUseBlocks) {
+        const result = await executeTool(block.name, block.input, level, authUserId)
+        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
+      }
+
+      // Send tool results back to Claude for final response
+      const followUp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1024,
+          system: systemPrompt,
+          tools,
+          messages: [
+            ...messages,
+            { role: 'assistant', content: data.content },
+            { role: 'user', content: toolResults },
+          ],
+        }),
+      })
+      const followData = await followUp.json()
+      const text = followData.content?.find((b: any) => b.type === 'text')?.text || 'Done.'
+      return NextResponse.json({ ok: true, text, tools_used: toolUseBlocks.map((b: any) => b.name) })
+    }
+
+    const text = data.content?.find((b: any) => b.type === 'text')?.text || 'Sorry, I could not generate a response.'
     return NextResponse.json({ ok: true, text })
   } catch (e: any) {
     console.error('Claude route error:', e)

@@ -50,7 +50,20 @@ export default function ClaudeClient({
         body: JSON.stringify({ messages: newMessages, authUserId, role, memberName }),
       })
       const data = await res.json()
-      setMessages(prev => [...prev, { role: 'assistant', content: data.text || 'Sorry, something went wrong.' }])
+      let responseText = data.text || 'Sorry, something went wrong.'
+      if (data.tools_used?.length) {
+        const toolLabels: Record<string, string> = {
+          create_wo: '✅ Created work order',
+          update_stage: '✅ Updated stage',
+          assign_wo: '✅ Assigned work order',
+          send_message: '✅ Sent message',
+          notify_client: '✅ Notified client',
+          add_schedule_date: '✅ Added schedule date',
+        }
+        const used = data.tools_used.map((t: string) => toolLabels[t] || t).join(' · ')
+        responseText = used + '\n\n' + responseText
+      }
+      setMessages(prev => [...prev, { role: 'assistant', content: responseText }])
     } catch (e) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Connection error. Please try again.' }])
     } finally {
