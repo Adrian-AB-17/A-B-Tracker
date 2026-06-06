@@ -252,7 +252,7 @@ export default function WoDetail({
       </div>
 
       {/* Tab content */}
-      <div className="max-w-[1400px] mx-auto px-6 py-6">
+      <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 overflow-x-hidden">
         {tab === 'overview' && (
           <OverviewTab wo={wo} lineItems={lineItems} assignees={assignees} isAdmin={isAdmin} team={team} />
         )}

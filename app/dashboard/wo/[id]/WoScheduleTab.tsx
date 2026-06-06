@@ -238,6 +238,13 @@ export default function WoScheduleTab({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <style>{`
+        .schedule-row { display: grid; grid-template-columns: 130px 150px 1fr 140px 130px 32px; gap: 8px; align-items: center; }
+        @media (max-width: 640px) {
+          .schedule-row { display: flex; flex-direction: column; gap: 8px; }
+          .schedule-row > * { width: 100% !important; }
+        }
+      `}</style>
       {/* Header */}
       <div style={{
         display: 'flex',
@@ -313,10 +320,8 @@ export default function WoScheduleTab({
               <div
                 key={row.id}
                 ref={el => { rowRefs.current[row.id] = el }}
+                className="schedule-row"
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '130px 150px 1fr 140px 130px 32px',
-                  gap: 8,
                   padding: 10,
                   background: 'white',
                   border: isHighlighted
@@ -325,7 +330,6 @@ export default function WoScheduleTab({
                       ? '1px solid rgba(217, 158, 43, 0.4)'
                       : '1px solid #e5e7eb',
                   borderRadius: 6,
-                  alignItems: 'center',
                   opacity: isBusy ? 0.6 : 1,
                   boxShadow: isHighlighted ? '0 0 0 4px rgba(217, 158, 43, 0.15)' : 'none',
                   transition: 'border-color 0.2s, box-shadow 0.2s',
