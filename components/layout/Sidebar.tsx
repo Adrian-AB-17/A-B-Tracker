@@ -144,11 +144,11 @@ export default function Sidebar({
             <path d="M3 12h18M3 6h18M3 18h18" />
           </svg>
         </button>
-        <div className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-2 no-underline">
           <span className="font-serif text-base font-semibold text-brand-navy">
             A<span className="text-brand-accent">&amp;</span>B Tracker
           </span>
-        </div>
+        </Link>
         <Link href="/dashboard/account" className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white hover:opacity-80 transition-opacity"
              style={{ background: 'var(--brand-gold, #b8860b)' }}>
           {member?.name?.[0] || '?'}
