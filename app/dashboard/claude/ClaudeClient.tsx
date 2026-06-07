@@ -497,7 +497,7 @@ export default function ClaudeClient({
                      cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center' }}>
             📎
           </button>
-          <input ref={fileInputRef} type="file" multiple accept=".csv,.xlsx,.xls"
+          <input ref={fileInputRef} type="file" multiple accept="*/*"
             onChange={e => e.target.files && handleFilesSelected(e.target.files)}
             style={{ display: 'none' }} />
 
