@@ -5,11 +5,13 @@ import ReportDashboard from './ReportDashboard'
 export const dynamic = 'force-dynamic'
 
 const CLIENTS: Record<string, { name: string; initials: string; color: string }> = {
-  'nico-roofing':  { name: 'Nico Roofing & Exteriors', initials: 'NR', color: '#ef4444' },
-  'culture':       { name: 'Culture Construction',      initials: 'CC', color: '#10b981' },
-  'rbs':           { name: 'Richards Building Supply',  initials: 'RB', color: '#0ea5e9' },
-  'apollo-events': { name: 'Apollo Supply',             initials: 'AS', color: '#f59e0b' },
-  'mvp-chiro':     { name: 'MVP Chiropractic',          initials: 'MC', color: '#8b5cf6' },
+  'nico-roofing':         { name: 'Nico Roofing & Exteriors',    initials: 'NR', color: '#ef4444' },
+  'culture':              { name: 'Culture Construction',         initials: 'CC', color: '#10b981' },
+  'kbc-exteriors':        { name: 'KBC Exteriors LLC',            initials: 'KB', color: '#f97316' },
+  'mvp-chiro':            { name: 'MVP Chiropractic',             initials: 'MC', color: '#8b5cf6' },
+  'midwest-construction': { name: 'Midwest Construction Experts', initials: 'ME', color: '#06b6d4' },
+  'rbs':                  { name: 'Richards Building Supply',     initials: 'RB', color: '#0ea5e9' },
+  'apollo-events':        { name: 'Apollo Supply',                initials: 'AS', color: '#f59e0b' },
 }
 
 function currentMonth() {

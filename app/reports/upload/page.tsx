@@ -5,9 +5,11 @@ import { createClient } from '@/lib/supabase/client'
 const CLIENTS = [
   { id: 'nico-roofing',          name: 'Nico Roofing & Exteriors' },
   { id: 'culture',               name: 'Culture Construction' },
+  { id: 'kbc-exteriors',         name: 'KBC Exteriors LLC' },
+  { id: 'mvp-chiro',             name: 'MVP Chiropractic' },
+  { id: 'midwest-construction',  name: 'Midwest Construction Experts' },
   { id: 'rbs',                   name: 'Richards Building Supply' },
   { id: 'apollo-events',         name: 'Apollo Supply' },
-  { id: 'mvp-chiro',             name: 'MVP Chiropractic' },
 ]
 
 const FILE_TYPES = [

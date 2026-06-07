@@ -2,11 +2,13 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 
 const CLIENTS = [
-  { id: 'nico-roofing',  name: 'Nico Roofing & Exteriors', initials: 'NR', color: '#ef4444' },
-  { id: 'culture',       name: 'Culture Construction',      initials: 'CC', color: '#10b981' },
-  { id: 'rbs',           name: 'Richards Building Supply',  initials: 'RB', color: '#0ea5e9' },
-  { id: 'apollo-events', name: 'Apollo Supply',             initials: 'AS', color: '#f59e0b' },
-  { id: 'mvp-chiro',     name: 'MVP Chiropractic',          initials: 'MC', color: '#8b5cf6' },
+  { id: 'nico-roofing',          name: 'Nico Roofing & Exteriors',     initials: 'NR', color: '#ef4444' },
+  { id: 'culture',               name: 'Culture Construction',          initials: 'CC', color: '#10b981' },
+  { id: 'kbc-exteriors',         name: 'KBC Exteriors LLC',             initials: 'KB', color: '#f97316' },
+  { id: 'mvp-chiro',             name: 'MVP Chiropractic',              initials: 'MC', color: '#8b5cf6' },
+  { id: 'midwest-construction',  name: 'Midwest Construction Experts',  initials: 'ME', color: '#06b6d4' },
+  { id: 'rbs',                   name: 'Richards Building Supply',      initials: 'RB', color: '#0ea5e9' },
+  { id: 'apollo-events',         name: 'Apollo Supply',                 initials: 'AS', color: '#f59e0b' },
 ]
 
 function currentMonth() {

@@ -6,19 +6,23 @@ type Message = { role: 'user' | 'assistant'; content: string }
 type AttachedFile = { name: string; type: string; content: string; size: number }
 
 const CLIENT_KEYWORDS: Record<string, string[]> = {
-  'nico-roofing':  ['nico roofing', 'nicoroofing', 'nico r'],
-  'culture':       ['culture construction', 'cultureccc'],
-  'rbs':           ['richards building', 'richardssupply', 'richards building supply'],
-  'apollo-events': ['apollo supply', 'apollosupply'],
-  'mvp-chiro':     ['mvp chiro', 'mvpchiro', 'mvp chiropractic'],
+  'nico-roofing':         ['nico roofing', 'nicoroofing', 'nico r'],
+  'culture':              ['culture construction', 'cultureccc'],
+  'kbc-exteriors':        ['kbc exteriors', 'kbcexteriors', 'kbc commercial'],
+  'mvp-chiro':            ['mvp chiro', 'mvpchiro', 'mvp chiropractic'],
+  'midwest-construction': ['midwest construction', 'midwestconstruction', 'midwest construction experts'],
+  'rbs':                  ['richards building', 'richardssupply', 'richards building supply'],
+  'apollo-events':        ['apollo supply', 'apollosupply'],
 }
 
 const CLIENT_NAMES: Record<string, string> = {
-  'nico-roofing':  'Nico Roofing & Exteriors',
-  'culture':       'Culture Construction',
-  'rbs':           'Richards Building Supply',
-  'apollo-events': 'Apollo Supply',
-  'mvp-chiro':     'MVP Chiropractic',
+  'nico-roofing':         'Nico Roofing & Exteriors',
+  'culture':              'Culture Construction',
+  'kbc-exteriors':        'KBC Exteriors LLC',
+  'mvp-chiro':            'MVP Chiropractic',
+  'midwest-construction': 'Midwest Construction Experts',
+  'rbs':                  'Richards Building Supply',
+  'apollo-events':        'Apollo Supply',
 }
 
 function currentMonth() {
