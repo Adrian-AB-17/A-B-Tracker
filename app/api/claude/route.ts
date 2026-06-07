@@ -191,6 +191,21 @@ const TOOLS = [
     },
   },
   {
+    name: 'generate_document',
+    description: 'Generate a document (SOW, brief, client update, proposal, scope) and save it as a file on a work order.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        wo_id:       { type: 'string', description: 'Work order ID (UUID)' },
+        wo_title:    { type: 'string', description: 'Work order title partial match' },
+        doc_content: { type: 'string', description: 'Full text content of the document' },
+        file_name:   { type: 'string', description: 'File name e.g. KBC_SOW_June2026.md' },
+        internal_only: { type: 'boolean', description: 'Internal only default true' },
+      },
+      required: ['doc_content', 'file_name'],
+    },
+  },
+  {
     name: 'attach_file_to_wo',
     description: 'Attach a file from the chat to a specific work order. Use when user uploads a file and asks to attach it to a WO.',
     input_schema: {
@@ -371,6 +386,24 @@ async function executeTool(name: string, input: any, level: string, authUserId: 
       })
       if (error) return 'Error: ' + error.message
       return 'Added scheduled date ' + input.scheduled_date + ' (' + input.type + ') to work order successfully.'
+    }
+
+    if (name === 'generate_document') {
+      let woId = input.wo_id
+      if (!woId && input.wo_title) {
+        const { data: wo } = await supabaseAdmin.from('work_orders').select('id').ilike('title', '%' + input.wo_title + '%').maybeSingle()
+        if (!wo) return 'Could not find work order: ' + input.wo_title
+        woId = wo.id
+      }
+      if (!woId) return 'Error: provide wo_id or wo_title'
+      const fileName = input.file_name.endsWith('.md') ? input.file_name : input.file_name + '.md'
+      const content = input.doc_content || ''
+      const path = 'wo-files/' + woId + '/' + Date.now() + '_' + fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const { error: upErr } = await supabaseAdmin.storage.from('ab-files').upload(path, content, { contentType: 'text/markdown', upsert: false })
+      if (upErr) return 'Upload failed: ' + upErr.message
+      const { error: dbErr } = await supabaseAdmin.from('wo_files').insert({ work_order_id: woId, name: fileName, storage_path: path, mime_type: 'text/markdown', size_bytes: content.length, uploaded_by_type: 'team', uploaded_by_id: authUserId, internal_only: input.internal_only !== false })
+      if (dbErr) return 'DB insert failed: ' + dbErr.message
+      return 'Generated and saved ' + fileName + ' to the work order. Visible in WO Files tab.'
     }
 
     if (name === 'attach_file_to_wo') {
