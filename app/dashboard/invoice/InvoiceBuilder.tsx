@@ -52,6 +52,7 @@ export default function InvoiceBuilder({
     }
   }, [])
   const [selectedWoIds, setSelectedWoIds] = useState<Set<string>>(new Set())
+  const [selectedStages, setSelectedStages] = useState<Set<string>>(new Set(['deliverables-executed','approved','in-progress','sent-for-approval','revisions-received']))
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0])
   const [generating, setGenerating] = useState(false)
@@ -62,8 +63,8 @@ export default function InvoiceBuilder({
 
   const client = clients.find(c => c.id === selectedClientId)
   const clientWos = useMemo(() =>
-    workOrders.filter(w => w.client_id === selectedClientId),
-    [workOrders, selectedClientId]
+    workOrders.filter(w => w.client_id === selectedClientId && selectedStages.has(w.stage)),
+    [workOrders, selectedClientId, selectedStages]
   )
   const selectedWos = useMemo(() =>
     clientWos.filter(w => selectedWoIds.has(w.id)),
@@ -202,6 +203,16 @@ export default function InvoiceBuilder({
               {clientWos.length > 0 && (
                 <button onClick={selectAll} className="text-xs text-blue-600 hover:underline">Select all</button>
               )}
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3 pb-3 border-b border-gray-100">
+              {['not-started','in-progress','deliverables-completed','sent-for-approval','revisions-received','approved','deliverables-executed','invoiced'].map(stage => (
+                <label key={stage} className="flex items-center gap-1.5 cursor-pointer">
+                  <input type="checkbox" checked={selectedStages.has(stage)}
+                    onChange={() => { setSelectedStages(prev => { const n = new Set(prev); n.has(stage) ? n.delete(stage) : n.add(stage); return n }); setSelectedWoIds(new Set()) }}
+                    className="w-3 h-3" />
+                  <span className="text-xs text-gray-600 capitalize">{stage.replace(/-/g, ' ')}</span>
+                </label>
+              ))}
             </div>
             {clientWos.length === 0 ? (
               <p className="text-sm text-gray-400">No billable work orders for this client.</p>
