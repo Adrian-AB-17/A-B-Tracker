@@ -1,5 +1,6 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 type Client = {
   id: string
@@ -40,7 +41,16 @@ export default function InvoiceBuilder({
   clients: Client[]
   workOrders: WO[]
 }) {
+  const searchParams = useSearchParams()
   const [selectedClientId, setSelectedClientId] = useState('')
+
+  useEffect(() => {
+    const clientParam = searchParams.get('client')
+    if (clientParam) {
+      const c = clients.find(cl => cl.id === clientParam)
+      if (c) selectClient(c.id)
+    }
+  }, [])
   const [selectedWoIds, setSelectedWoIds] = useState<Set<string>>(new Set())
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [issueDate, setIssueDate] = useState(new Date().toISOString().split('T')[0])
