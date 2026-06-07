@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import mammoth from 'mammoth'
+import * as pdfParse from 'pdf-parse'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -61,7 +63,7 @@ async function buildContext(level: 'owner' | 'admin' | 'team', authUserId: strin
     ' | Owner: ' + (w.team_members?.name || 'unassigned')
   ).join('\n')
 
-  let context = 'You are the A&B Consulting Group internal AI assistant. Today is ' + now + '.\n' +
+  let context = 'You are the A&B Consulting Group internal AI assistant. IMPORTANT: Never share cost, pricing, invoice amounts, or financial data in any message that will be sent to a client or visible in client-facing communications. Cost data is internal only. Today is ' + now + '.\n' +
     'You help the team manage work orders, clients, schedules, and operations.\n' +
     'The person talking to you is ' + memberName + ' (' + level + ' level).\n\n' +
     'WORK ORDER SUMMARY (' + filteredWos.length + ' active WOs):\n' +
@@ -460,8 +462,28 @@ async function executeTool(name: string, input: any, level: string, authUserId: 
           } catch {
             results.push('File: ' + file.name + ' (download failed)')
           }
+        } else if (isPdf) {
+          try {
+            const res = await fetch(signed.signedUrl)
+            const buffer = Buffer.from(await res.arrayBuffer())
+            const parsed = await (pdfParse as any).default(buffer)
+            const text = parsed.text || ''
+            results.push('=== ' + file.name + ' (PDF) ===\n' + text.substring(0, 4000) + (text.length > 4000 ? '\n...(truncated)' : ''))
+          } catch (e: any) {
+            results.push('File: ' + file.name + ' (PDF parse failed: ' + e.message + ')')
+          }
+        } else if (isDoc) {
+          try {
+            const res = await fetch(signed.signedUrl)
+            const buffer = Buffer.from(await res.arrayBuffer())
+            const result = await mammoth.extractRawText({ buffer })
+            const text = result.value || ''
+            results.push('=== ' + file.name + ' (Word doc) ===\n' + text.substring(0, 4000) + (text.length > 4000 ? '\n...(truncated)' : ''))
+          } catch (e: any) {
+            results.push('File: ' + file.name + ' (DOCX parse failed: ' + e.message + ')')
+          }
         } else {
-          results.push('File: ' + file.name + ' (' + (file.mime_type || 'unknown type') + ', ' + Math.round((file.size_bytes || 0) / 1024) + ' KB) — binary file, cannot read content directly')
+          results.push('File: ' + file.name + ' (' + (file.mime_type || 'unknown type') + ', ' + Math.round((file.size_bytes || 0) / 1024) + ' KB) — binary file format not supported for reading')
         }
       }
 
