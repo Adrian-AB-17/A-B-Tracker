@@ -100,7 +100,7 @@ export default function Sidebar({
   const [viewMode, setViewMode] = useViewMode(isAdmin)
   // In team mode, admin-only items are hidden even for admins.
   const items = NAV.filter(n => {
-    if (n.ownerOnly) return isOwner
+    if (n.ownerOnly) return isOwner && viewMode === 'admin'
     if (!n.adminOnly) return true
     if (!isAdmin) return false
     return viewMode === 'admin'
