@@ -46,17 +46,13 @@ export default async function PortalLayout({ children }: { children: React.React
           <a href="/portal"
             style={{ color: 'rgba(255,255,255,0.75)', textDecoration: 'none', fontSize: 13,
                      fontWeight: 500, padding: '6px 12px', borderRadius: 6,
-                     transition: 'background 0.15s' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                     transition: 'background 0.15s' }}>
             Dashboard
           </a>
           <a href="/portal/report"
             style={{ color: 'rgba(255,255,255,0.75)', textDecoration: 'none', fontSize: 13,
                      fontWeight: 500, padding: '6px 12px', borderRadius: 6,
-                     transition: 'background 0.15s' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                     transition: 'background 0.15s' }}>
             📊 Monthly Report
           </a>
         </div>
