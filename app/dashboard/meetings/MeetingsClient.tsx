@@ -1,6 +1,7 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 type ActionItem = {
   title: string
@@ -26,6 +27,7 @@ type Extracted = {
 
 type Client = { id: string; name: string }
 type TeamMember = { id: string; name: string; auth_user_id: string }
+type WorkOrder = { id: string; title: string; stage: string }
 
 export default function MeetingsClient({
   currentUserId, currentMember, clients, team,
@@ -35,6 +37,7 @@ export default function MeetingsClient({
   clients: Client[]
   team: TeamMember[]
 }) {
+  const supabase = createClient()
   const router = useRouter()
   const [transcript, setTranscript] = useState('')
   const [loading, setLoading] = useState(false)
@@ -42,6 +45,29 @@ export default function MeetingsClient({
   const [pushing, setPushing] = useState(false)
   const [pushResult, setPushResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // WO linking
+  const [linkClientId, setLinkClientId] = useState('')
+  const [linkWoId, setLinkWoId] = useState('')
+  const [clientWos, setClientWos] = useState<WorkOrder[]>([])
+  const [loadingWos, setLoadingWos] = useState(false)
+
+  useEffect(() => {
+    if (!linkClientId) { setClientWos([]); setLinkWoId(''); return }
+    setLoadingWos(true)
+    setLinkWoId('')
+    supabase
+      .from('work_orders')
+      .select('id, title, stage')
+      .eq('client_id', linkClientId)
+      .not('stage', 'in', '("paid","archived")')
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        setClientWos(data || [])
+        setLoadingWos(false)
+      })
+  }, [linkClientId])
 
   async function extract() {
     if (!transcript.trim()) return
@@ -57,11 +83,17 @@ export default function MeetingsClient({
       })
       const data = await res.json()
       if (!data.ok) { setError(data.error || 'Extraction failed'); return }
-      // Add selected flag to each action item
       setExtracted({
         ...data.extracted,
         action_items: data.extracted.action_items.map((item: any) => ({ ...item, selected: item.create_wo }))
       })
+      // Auto-set client on action items if WO is linked
+      if (linkClientId) {
+        setExtracted(prev => prev ? {
+          ...prev,
+          action_items: prev.action_items.map(item => ({ ...item, client_id: linkClientId }))
+        } : prev)
+      }
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -115,7 +147,26 @@ export default function MeetingsClient({
       } catch { errors++ }
     }
 
-    setPushResult(`✅ Created ${created} work order${created !== 1 ? 's' : ''}${errors > 0 ? ` (${errors} failed)` : ''}`)
+    // If a WO is linked, attach the meeting summary as a comment
+    if (linkWoId && extracted.summary) {
+      const commentBody = [
+        `📋 **Meeting: ${extracted.meeting_title}**`,
+        extracted.meeting_date ? `📅 ${extracted.meeting_date}` : '',
+        extracted.participants.length ? `👥 ${extracted.participants.join(', ')}` : '',
+        '',
+        extracted.summary,
+        extracted.decisions.length ? `\n**Decisions:**\n${extracted.decisions.map(d => `• ${d}`).join('\n')}` : '',
+      ].filter(Boolean).join('\n')
+
+      await supabase.from('wo_comments').insert({
+        work_order_id: linkWoId,
+        author_id: currentUserId,
+        body: commentBody,
+      })
+    }
+
+    const linkedMsg = linkWoId ? ' · Meeting notes attached to WO' : ''
+    setPushResult(`✅ Created ${created} work order${created !== 1 ? 's' : ''}${errors > 0 ? ` (${errors} failed)` : ''}${linkedMsg}`)
     setPushing(false)
     if (created > 0) router.refresh()
   }
@@ -123,6 +174,8 @@ export default function MeetingsClient({
   const priorityColor: Record<string, string> = {
     urgent: '#dc2626', high: '#ea580c', medium: '#d97706', low: '#6b7280'
   }
+
+  const linkedWo = clientWos.find(w => w.id === linkWoId)
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 24px' }}>
@@ -136,16 +189,58 @@ export default function MeetingsClient({
         </p>
       </div>
 
+      {/* Link to WO section */}
+      <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12,
+                    padding: 16, marginBottom: 20 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase',
+                      letterSpacing: '0.06em', marginBottom: 10 }}>
+          Link to Work Order <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional — attaches meeting notes to the WO)</span>
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <select value={linkClientId} onChange={e => setLinkClientId(e.target.value)}
+            style={{ fontSize: 13, border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px',
+                     background: 'var(--bg)', color: 'var(--text)', minWidth: 180 }}>
+            <option value="">Select client…</option>
+            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+
+          {linkClientId && (
+            <select value={linkWoId} onChange={e => setLinkWoId(e.target.value)}
+              disabled={loadingWos}
+              style={{ fontSize: 13, border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px',
+                       background: 'var(--bg)', color: 'var(--text)', flex: 1, minWidth: 220,
+                       opacity: loadingWos ? 0.5 : 1 }}>
+              <option value="">{loadingWos ? 'Loading…' : 'Select work order…'}</option>
+              {clientWos.map(wo => (
+                <option key={wo.id} value={wo.id}>{wo.title}</option>
+              ))}
+            </select>
+          )}
+
+          {linkWoId && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+                          background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)',
+                          borderRadius: 8, fontSize: 12, color: '#6366f1', fontWeight: 600 }}>
+              🔗 Linked: {linkedWo?.title}
+              <button onClick={() => { setLinkWoId(''); setLinkClientId('') }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af',
+                         fontSize: 14, lineHeight: 1, padding: 0, marginLeft: 4 }}>×</button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Transcript input */}
       {!extracted && (
-        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12,
+                      padding: 20, marginBottom: 20 }}>
           <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', display: 'block', marginBottom: 8 }}>
             Paste transcript
           </label>
           <textarea
             value={transcript}
             onChange={e => setTranscript(e.target.value)}
-            placeholder="speaker1 00:00:00&#10;Hello everyone...&#10;&#10;speaker2 00:00:15&#10;Let's get started..."
+            placeholder={"speaker1 00:00:00\nHello everyone...\n\nspeaker2 00:00:15\nLet's get started..."}
             rows={12}
             style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px',
                      fontFamily: 'monospace', fontSize: 12, background: 'var(--bg)', color: 'var(--text)',
@@ -153,7 +248,7 @@ export default function MeetingsClient({
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {transcript.length > 0 ? transcript.split('\\n').length + ' lines' : 'Supports Zoom, Teams, or any speaker-labeled transcript'}
+              {transcript.length > 0 ? transcript.split('\n').length + ' lines' : 'Supports Zoom, Teams, or any speaker-labeled transcript'}
             </span>
             <button onClick={extract} disabled={loading || !transcript.trim()}
               style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#1a2744',
@@ -170,7 +265,8 @@ export default function MeetingsClient({
       {extracted && (
         <div>
           {/* Summary card */}
-          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12,
+                        padding: 20, marginBottom: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <h2 style={{ fontFamily: 'Fraunces, serif', fontSize: 20, color: 'var(--text)', margin: '0 0 6px' }}>
@@ -179,6 +275,11 @@ export default function MeetingsClient({
                 <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
                   {extracted.meeting_date && <span>📅 {extracted.meeting_date} · </span>}
                   <span>👥 {extracted.participants.join(', ')}</span>
+                  {linkWoId && linkedWo && (
+                    <span style={{ marginLeft: 8, color: '#6366f1', fontWeight: 600 }}>
+                      🔗 {linkedWo.title}
+                    </span>
+                  )}
                 </div>
                 <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>{extracted.summary}</p>
               </div>
@@ -190,7 +291,8 @@ export default function MeetingsClient({
 
             {extracted.decisions.length > 0 && (
               <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Key Decisions</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase',
+                              letterSpacing: '0.06em', marginBottom: 6 }}>Key Decisions</div>
                 {extracted.decisions.map((d, i) => (
                   <div key={i} style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>• {d}</div>
                 ))}
@@ -199,7 +301,8 @@ export default function MeetingsClient({
 
             {extracted.out_of_office.length > 0 && (
               <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Out of Office</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase',
+                              letterSpacing: '0.06em', marginBottom: 6 }}>Out of Office</div>
                 {extracted.out_of_office.map((o, i) => (
                   <div key={i} style={{ fontSize: 13, color: '#ea580c', marginBottom: 4 }}>
                     ✈️ {o.person}: {o.from} – {o.to} ({o.reason})
@@ -210,8 +313,10 @@ export default function MeetingsClient({
           </div>
 
           {/* Action items */}
-          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12,
+                        overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex',
+                          justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <span style={{ fontFamily: 'Fraunces, serif', fontSize: 17, color: 'var(--text)' }}>Action Items</span>
                 <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--text-muted)' }}>
@@ -220,7 +325,8 @@ export default function MeetingsClient({
               </div>
             </div>
             {extracted.action_items.map((item, i) => (
-              <div key={i} style={{ padding: '14px 20px', borderBottom: i < extracted.action_items.length - 1 ? '1px solid var(--border)' : 'none',
+              <div key={i} style={{ padding: '14px 20px',
+                                    borderBottom: i < extracted.action_items.length - 1 ? '1px solid var(--border)' : 'none',
                                     background: item.selected ? 'var(--bg)' : 'transparent', opacity: item.selected ? 1 : 0.6 }}>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <input type="checkbox" checked={item.selected} onChange={() => toggleItem(i)}
@@ -262,11 +368,17 @@ export default function MeetingsClient({
           {/* Push button */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
             {pushResult && <span style={{ fontSize: 13, color: '#16a34a', fontWeight: 600 }}>{pushResult}</span>}
-            <button onClick={pushToTracker} disabled={pushing || extracted.action_items.filter(i => i.selected).length === 0}
+            <button onClick={pushToTracker}
+              disabled={pushing || extracted.action_items.filter(i => i.selected).length === 0}
               style={{ padding: '12px 28px', borderRadius: 8, border: 'none', background: '#1a2744',
                        color: '#b8860b', fontWeight: 700, fontSize: 14, cursor: 'pointer',
                        opacity: pushing || extracted.action_items.filter(i => i.selected).length === 0 ? 0.5 : 1 }}>
-              {pushing ? '⏳ Creating...' : `🚀 Create ${extracted.action_items.filter(i => i.selected).length} Work Order${extracted.action_items.filter(i => i.selected).length !== 1 ? 's' : ''}`}
+              {pushing
+                ? '⏳ Creating...'
+                : linkWoId
+                  ? `🚀 Create ${extracted.action_items.filter(i => i.selected).length} WO${extracted.action_items.filter(i => i.selected).length !== 1 ? 's' : ''} + Attach Notes`
+                  : `🚀 Create ${extracted.action_items.filter(i => i.selected).length} Work Order${extracted.action_items.filter(i => i.selected).length !== 1 ? 's' : ''}`
+              }
             </button>
           </div>
         </div>
