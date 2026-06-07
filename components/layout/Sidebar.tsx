@@ -94,7 +94,7 @@ export default function Sidebar({
   const [teamTasksOpen, setTeamTasksOpen] = useState(() =>
     pathname.startsWith('/dashboard/tasks/') && pathname !== '/dashboard/tasks/all'
   )
-  const isAdmin = member?.role === 'admin'
+  const isAdmin = member?.role === 'admin' || member?.role === 'owner'
   const [viewMode, setViewMode] = useViewMode(isAdmin)
   // In team mode, admin-only items are hidden even for admins.
   const items = NAV.filter(n => {
