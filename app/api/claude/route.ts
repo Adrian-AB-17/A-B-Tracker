@@ -191,14 +191,18 @@ const TOOLS = [
     },
   },
   {
-    name: 'read_wo_files',
-    description: 'Read the files and attachments on a work order. Use this when asked to summarize, review, or reference documents attached to a WO.',
+    name: 'attach_file_to_wo',
+    description: 'Attach a file from the chat to a specific work order. Use when user uploads a file and asks to attach it to a WO.',
     input_schema: {
       type: 'object',
       properties: {
-        wo_id:    { type: 'string', description: 'Work order ID (UUID)' },
-        wo_title: { type: 'string', description: 'Work order title (partial match ok) — used if wo_id not provided' },
+        wo_id:        { type: 'string', description: 'Work order ID (UUID)' },
+        wo_title:     { type: 'string', description: 'Work order title partial match' },
+        file_name:    { type: 'string', description: 'Name of the file' },
+        file_content: { type: 'string', description: 'Text content of the file' },
+        internal_only:{ type: 'boolean', description: 'Internal only flag (default true)' },
       },
+      required: ['file_name', 'file_content'],
     },
   },
   {
@@ -369,6 +373,29 @@ async function executeTool(name: string, input: any, level: string, authUserId: 
       return 'Added scheduled date ' + input.scheduled_date + ' (' + input.type + ') to work order successfully.'
     }
 
+    if (name === 'attach_file_to_wo') {
+      let woId = input.wo_id
+      if (!woId && input.wo_title) {
+        const { data: wo } = await supabaseAdmin.from('work_orders').select('id').ilike('title', '%' + input.wo_title + '%').maybeSingle()
+        if (!wo) return 'Could not find work order: ' + input.wo_title
+        woId = wo.id
+      }
+      if (!woId) return 'Error: provide wo_id or wo_title'
+      const fileName = input.file_name
+      const content = input.file_content || ''
+      const path = 'wo-files/' + woId + '/' + Date.now() + '_' + fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const { error: upErr } = await supabaseAdmin.storage.from('ab-files').upload(path, content, { contentType: 'text/plain', upsert: false })
+      if (upErr) return 'Upload failed: ' + upErr.message
+      const { error: dbErr } = await supabaseAdmin.from('wo_files').insert({
+        work_order_id: woId, name: fileName, storage_path: path,
+        mime_type: 'text/plain', size_bytes: content.length,
+        uploaded_by_type: 'team', uploaded_by_id: authUserId,
+        internal_only: input.internal_only !== false,
+      })
+      if (dbErr) return 'DB insert failed: ' + dbErr.message
+      return 'Attached ' + fileName + ' to the work order successfully.'
+    }
+
     if (name === 'read_wo_files') {
       let woId = input.wo_id
       if (!woId && input.wo_title) {
@@ -408,44 +435,6 @@ async function executeTool(name: string, input: any, level: string, authUserId: 
       return 'Files on this work order:\n\n' + results.join('\n\n')
     }
 
-        if (name === 'read_wo_files') {
-      let woId = input.wo_id
-      if (!woId && input.wo_title) {
-        const { data: wo } = await supabaseAdmin.from('work_orders').select('id, title').ilike('title', '%' + input.wo_title + '%').maybeSingle()
-        if (!wo) return 'Could not find work order matching: ' + input.wo_title
-        woId = wo.id
-      }
-      if (!woId) return 'Error: Please provide wo_id or wo_title'
-
-      const { data: files } = await supabaseAdmin.from('wo_files').select('id, name, storage_path, mime_type, size_bytes, created_at').eq('work_order_id', woId).order('created_at', { ascending: false })
-      if (!files?.length) return 'No files attached to this work order.'
-
-      const results: string[] = []
-      for (const file of files.slice(0, 5)) {
-        // Generate signed URL
-        const { data: signed } = await supabaseAdmin.storage.from('ab-files').createSignedUrl(file.storage_path, 300)
-        if (!signed?.signedUrl) { results.push('File: ' + file.name + ' (could not generate download URL)'); continue }
-
-        // Try to fetch text content for readable files
-        const isText = file.mime_type?.includes('text') || file.name.endsWith('.csv') || file.name.endsWith('.txt') || file.name.endsWith('.md')
-        const isDoc = file.name.endsWith('.docx') || file.name.endsWith('.doc')
-        const isPdf = file.mime_type?.includes('pdf') || file.name.endsWith('.pdf')
-
-        if (isText) {
-          try {
-            const res = await fetch(signed.signedUrl)
-            const text = await res.text()
-            results.push('=== ' + file.name + ' ===\n' + text.substring(0, 4000) + (text.length > 4000 ? '\n...(truncated)' : ''))
-          } catch {
-            results.push('File: ' + file.name + ' (download failed)')
-          }
-        } else {
-          results.push('File: ' + file.name + ' (' + (file.mime_type || 'unknown type') + ', ' + Math.round((file.size_bytes || 0) / 1024) + ' KB) — binary file, cannot read content directly')
-        }
-      }
-
-      return 'Files on this work order:\n\n' + results.join('\n\n')
-    }
 
         return 'Unknown tool: ' + name
   } catch (e: any) {
