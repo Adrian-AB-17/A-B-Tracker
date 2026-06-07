@@ -191,6 +191,28 @@ const TOOLS = [
     },
   },
   {
+    name: 'read_wo_files',
+    description: 'Read the files and attachments on a work order. Use this when asked to summarize, review, or reference documents attached to a WO.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        wo_id:    { type: 'string', description: 'Work order ID (UUID)' },
+        wo_title: { type: 'string', description: 'Work order title (partial match ok) — used if wo_id not provided' },
+      },
+    },
+  },
+  {
+    name: 'read_wo_files',
+    description: 'Read the files and attachments on a work order. Use this when asked to summarize, review, or reference documents attached to a WO.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        wo_id:    { type: 'string', description: 'Work order ID (UUID)' },
+        wo_title: { type: 'string', description: 'Work order title (partial match ok) — used if wo_id not provided' },
+      },
+    },
+  },
+  {
     name: 'add_schedule_date',
     description: 'Add a scheduled date/deliverable to a work order',
     input_schema: {
@@ -347,7 +369,85 @@ async function executeTool(name: string, input: any, level: string, authUserId: 
       return 'Added scheduled date ' + input.scheduled_date + ' (' + input.type + ') to work order successfully.'
     }
 
-    return 'Unknown tool: ' + name
+    if (name === 'read_wo_files') {
+      let woId = input.wo_id
+      if (!woId && input.wo_title) {
+        const { data: wo } = await supabaseAdmin.from('work_orders').select('id, title').ilike('title', '%' + input.wo_title + '%').maybeSingle()
+        if (!wo) return 'Could not find work order matching: ' + input.wo_title
+        woId = wo.id
+      }
+      if (!woId) return 'Error: Please provide wo_id or wo_title'
+
+      const { data: files } = await supabaseAdmin.from('wo_files').select('id, name, storage_path, mime_type, size_bytes, created_at').eq('work_order_id', woId).order('created_at', { ascending: false })
+      if (!files?.length) return 'No files attached to this work order.'
+
+      const results: string[] = []
+      for (const file of files.slice(0, 5)) {
+        // Generate signed URL
+        const { data: signed } = await supabaseAdmin.storage.from('ab-files').createSignedUrl(file.storage_path, 300)
+        if (!signed?.signedUrl) { results.push('File: ' + file.name + ' (could not generate download URL)'); continue }
+
+        // Try to fetch text content for readable files
+        const isText = file.mime_type?.includes('text') || file.name.endsWith('.csv') || file.name.endsWith('.txt') || file.name.endsWith('.md')
+        const isDoc = file.name.endsWith('.docx') || file.name.endsWith('.doc')
+        const isPdf = file.mime_type?.includes('pdf') || file.name.endsWith('.pdf')
+
+        if (isText) {
+          try {
+            const res = await fetch(signed.signedUrl)
+            const text = await res.text()
+            results.push('=== ' + file.name + ' ===\n' + text.substring(0, 4000) + (text.length > 4000 ? '\n...(truncated)' : ''))
+          } catch {
+            results.push('File: ' + file.name + ' (download failed)')
+          }
+        } else {
+          results.push('File: ' + file.name + ' (' + (file.mime_type || 'unknown type') + ', ' + Math.round((file.size_bytes || 0) / 1024) + ' KB) — binary file, cannot read content directly')
+        }
+      }
+
+      return 'Files on this work order:\n\n' + results.join('\n\n')
+    }
+
+        if (name === 'read_wo_files') {
+      let woId = input.wo_id
+      if (!woId && input.wo_title) {
+        const { data: wo } = await supabaseAdmin.from('work_orders').select('id, title').ilike('title', '%' + input.wo_title + '%').maybeSingle()
+        if (!wo) return 'Could not find work order matching: ' + input.wo_title
+        woId = wo.id
+      }
+      if (!woId) return 'Error: Please provide wo_id or wo_title'
+
+      const { data: files } = await supabaseAdmin.from('wo_files').select('id, name, storage_path, mime_type, size_bytes, created_at').eq('work_order_id', woId).order('created_at', { ascending: false })
+      if (!files?.length) return 'No files attached to this work order.'
+
+      const results: string[] = []
+      for (const file of files.slice(0, 5)) {
+        // Generate signed URL
+        const { data: signed } = await supabaseAdmin.storage.from('ab-files').createSignedUrl(file.storage_path, 300)
+        if (!signed?.signedUrl) { results.push('File: ' + file.name + ' (could not generate download URL)'); continue }
+
+        // Try to fetch text content for readable files
+        const isText = file.mime_type?.includes('text') || file.name.endsWith('.csv') || file.name.endsWith('.txt') || file.name.endsWith('.md')
+        const isDoc = file.name.endsWith('.docx') || file.name.endsWith('.doc')
+        const isPdf = file.mime_type?.includes('pdf') || file.name.endsWith('.pdf')
+
+        if (isText) {
+          try {
+            const res = await fetch(signed.signedUrl)
+            const text = await res.text()
+            results.push('=== ' + file.name + ' ===\n' + text.substring(0, 4000) + (text.length > 4000 ? '\n...(truncated)' : ''))
+          } catch {
+            results.push('File: ' + file.name + ' (download failed)')
+          }
+        } else {
+          results.push('File: ' + file.name + ' (' + (file.mime_type || 'unknown type') + ', ' + Math.round((file.size_bytes || 0) / 1024) + ' KB) — binary file, cannot read content directly')
+        }
+      }
+
+      return 'Files on this work order:\n\n' + results.join('\n\n')
+    }
+
+        return 'Unknown tool: ' + name
   } catch (e: any) {
     return 'Tool error: ' + e.message
   }
