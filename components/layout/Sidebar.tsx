@@ -28,7 +28,6 @@ const NAV: NavItem[] = [
   { href: '/dashboard/tasks',     label: 'My Tasks',        icon: '✓', countKey: 'myTasks',  section: 'filters' },
   { href: '/dashboard/tasks/all', label: 'All Tasks',       icon: '✓✓', section: 'filters' },
   { href: '/dashboard/dms', label: 'Mav Direct', icon: '✦', section: 'filters' },
-  { href: '/dashboard/dms', label: 'Mav Direct', icon: '✦', section: 'filters' },
   { href: '/dashboard/messages',  label: 'Messages',        icon: '💬', section: 'filters' },
   { href: '/dashboard/claude', label: 'Mav', icon: '✦', section: 'filters' },
   { href: '/dashboard/comms', label: 'Comms', icon: '📨', adminOnly: true, section: 'filters' },
