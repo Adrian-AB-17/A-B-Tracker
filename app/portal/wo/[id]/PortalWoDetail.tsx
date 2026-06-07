@@ -75,6 +75,7 @@ export default function PortalWoDetail({
   const [comments, setComments] = useState<Comment[]>(initialComments)
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)
+  const [showMentionHint, setShowMentionHint] = useState(false)
   const sv = stageView(wo.stage)
   const cost = (wo.est_cost || 0) + (wo.add_cost || 0)
   const showCost = ['invoiced', 'paid'].includes(wo.stage) && cost > 0
@@ -283,11 +284,26 @@ export default function PortalWoDetail({
           </div>
         </div>
         <div style={{ padding: '12px 20px', borderTop: '1px solid #e8e6dd' }}>
-          <textarea value={body} onChange={e => setBody(e.target.value)}
-            onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') post() }}
-            placeholder="Write a message to your team…"
-            style={{ width: '100%', border: '1px solid #e8e6dd', borderRadius: 8, padding: '10px 12px',
-                     fontFamily: 'inherit', fontSize: 14, minHeight: 64, resize: 'vertical' }} />
+          <div style={{ position: 'relative' }}>
+            <textarea value={body}
+              onChange={e => { setBody(e.target.value); setShowMentionHint(e.target.value.endsWith('@')) }}
+              onKeyDown={e => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') post() }}
+              placeholder="Write a message to your A&B team… use @ to tag them"
+              style={{ width: '100%', border: '1px solid #e8e6dd', borderRadius: 8, padding: '10px 12px',
+                       fontFamily: 'inherit', fontSize: 14, minHeight: 64, resize: 'vertical' }} />
+            {showMentionHint && (
+              <div style={{ position: 'absolute', bottom: '100%', left: 0, marginBottom: 4, background: 'white',
+                            border: '1px solid #e8e6dd', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', overflow: 'hidden', zIndex: 50 }}>
+                <button onMouseDown={e => { e.preventDefault(); setBody(b => b + 'A&B Team '); setShowMentionHint(false) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', width: '100%',
+                            background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#1a2744', fontWeight: 600 }}>
+                  <span style={{ width: 24, height: 24, borderRadius: '50%', background: '#1a2744', color: 'white',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>AB</span>
+                  A&amp;B Team
+                </button>
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
             <button onClick={post} disabled={busy || !body.trim()}
               style={{ background: '#0f1b34', color: 'white', border: 'none', borderRadius: 6,

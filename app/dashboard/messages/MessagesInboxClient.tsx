@@ -380,6 +380,8 @@ function WoGroup({
   const supabase = createClient()
   const [replyOpen, setReplyOpen] = useState(false)
   const [body, setBody] = useState("")
+  const [mentionDropdown, setMentionDropdown] = useState<{ open: boolean; query: string; position: number }>({ open: false, query: '', position: 0 })
+  const [mentionIndex, setMentionIndex] = useState(0)
   const [posting, setPosting] = useState(false)
   const [visibleToClient, setVisibleToClient] = useState(false)
 
@@ -399,6 +401,28 @@ function WoGroup({
     })
     return ids
   }
+
+  function handleBodyInput(value: string, cursorPos: number) {
+    setBody(value)
+    const before = value.substring(0, cursorPos)
+    const m = before.match(/(?:^|\s)@(\w*)$/)
+    if (m) {
+      setMentionDropdown({ open: true, query: m[1].toLowerCase(), position: cursorPos - m[1].length - 1 })
+      setMentionIndex(0)
+    } else {
+      setMentionDropdown({ open: false, query: '', position: 0 })
+    }
+  }
+
+  function insertMention(memberName: string) {
+    const cursorPos = mentionDropdown.position + 1 + mentionDropdown.query.length
+    const before = body.substring(0, mentionDropdown.position)
+    const after = body.substring(cursorPos)
+    setBody(before + '@' + memberName + ' ' + after)
+    setMentionDropdown({ open: false, query: '', position: 0 })
+  }
+
+  const mentionMatches = team.filter(t => t.name.toLowerCase().includes(mentionDropdown.query)).slice(0, 6)
 
   async function postReply() {
     const text = body.trim()
@@ -508,20 +532,36 @@ function WoGroup({
       <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
         {replyOpen ? (
           <div className="space-y-2 w-full">
+            <div className="relative">
             <textarea
               value={body}
-              onChange={e => setBody(e.target.value)}
+              onChange={e => handleBodyInput(e.target.value, e.target.selectionStart || 0)}
               onKeyDown={e => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault()
-                  postReply()
+                if (mentionDropdown.open) {
+                  if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, mentionMatches.length - 1)); return }
+                  if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); return }
+                  if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); if (mentionMatches[mentionIndex]) insertMention(mentionMatches[mentionIndex].name); return }
+                  if (e.key === 'Escape') { setMentionDropdown({ open: false, query: '', position: 0 }); return }
                 }
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); postReply() }
               }}
               placeholder="Reply… use @ to mention. (Cmd+Enter to post)"
               rows={2}
               autoFocus
               className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg resize-y focus:outline-none focus:border-blue-500"
             />
+            {mentionDropdown.open && mentionMatches.length > 0 && (
+              <div className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 min-w-[160px]" style={{ bottom: '100%', left: 0, marginBottom: 4 }}>
+                {mentionMatches.map((t, i) => (
+                  <button key={t.id} onMouseDown={e => { e.preventDefault(); insertMention(t.name) }}
+                    className={"w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 " + (i === mentionIndex ? "bg-blue-50 text-blue-800" : "text-gray-700 hover:bg-gray-50")}>
+                    <span className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold flex-shrink-0">{t.name[0]}</span>
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            </div>
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
                 <input
