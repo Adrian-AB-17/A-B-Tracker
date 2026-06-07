@@ -73,11 +73,17 @@ Rules:
     const data = await res.json()
     const text = data.content?.[0]?.text || ''
 
-    // Parse JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) return NextResponse.json({ ok: false, error: 'Could not parse response' }, { status: 500 })
-
-    const extracted = JSON.parse(jsonMatch[0])
+    // Parse JSON from response — strip markdown fences first, then extract outermost object
+    const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+    const start = cleaned.indexOf('{')
+    const end = cleaned.lastIndexOf('}')
+    if (start === -1 || end === -1) return NextResponse.json({ ok: false, error: 'Could not parse response: no JSON object found' }, { status: 500 })
+    let extracted
+    try {
+      extracted = JSON.parse(cleaned.slice(start, end + 1))
+    } catch (parseErr: any) {
+      return NextResponse.json({ ok: false, error: 'JSON parse error: ' + parseErr.message }, { status: 500 })
+    }
     return NextResponse.json({ ok: true, extracted })
   } catch (e: any) {
     console.error('Meeting extract error:', e)
