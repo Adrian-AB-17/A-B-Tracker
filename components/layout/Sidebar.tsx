@@ -32,6 +32,7 @@ const NAV: NavItem[] = [
   { href: '/dashboard/claude', label: 'Mav', icon: '✦', section: 'filters' },
   { href: '/dashboard/comms', label: 'Comms', icon: '📨', adminOnly: true, section: 'filters' },
   { href: '/dashboard/meetings', label: 'Meetings', icon: '📋', section: 'filters' },
+  { href: '/dashboard/invoice', label: 'Invoices', icon: '🧾', adminOnly: true, section: 'filters' },
   { href: '/reports', label: 'Reports', icon: '📈', adminOnly: true, section: 'filters' },
   { href: '/dashboard/standup?channel=general',   label: 'HQ',         icon: '☀️', section: 'filters' },
   { href: '/dashboard/mentions',  label: 'My Mentions',     icon: '@', section: 'filters' },
