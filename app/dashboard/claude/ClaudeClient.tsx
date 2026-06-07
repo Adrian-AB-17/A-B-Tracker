@@ -132,7 +132,6 @@ export default function ClaudeClient({
         const content = await readFileAsText(file)
         newFiles.push({ name: file.name, type: 'csv', content, size: file.size })
       } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-        // For Excel, store as base64 for processing
         const content = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
           reader.onload = e => resolve(e.target?.result as string)
@@ -140,6 +139,14 @@ export default function ClaudeClient({
           reader.readAsDataURL(file)
         })
         newFiles.push({ name: file.name, type: 'excel', content, size: file.size })
+      } else {
+        // Any other file type — store name and size for display, read as text if possible
+        try {
+          const content = await readFileAsText(file)
+          newFiles.push({ name: file.name, type: 'document', content, size: file.size })
+        } catch {
+          newFiles.push({ name: file.name, type: 'document', content: '', size: file.size })
+        }
       }
     }
     setAttachedFiles(prev => [...prev, ...newFiles])
