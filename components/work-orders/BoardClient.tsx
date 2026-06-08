@@ -453,10 +453,15 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     const overdue: WorkOrder[] = []
     workOrders.forEach(wo => {
       if (!wo.due_date) return
-      if (['paid', 'archived'].includes(wo.stage)) return
       const dd = new Date(wo.due_date)
-      if (dd >= todayStart && dd < todayEnd) dueToday.push(wo)
-      else if (dd < todayStart) overdue.push(wo)
+      dd.setHours(0, 0, 0, 0)
+      if (dd >= todayStart && dd < todayEnd) {
+        if (!['paid','archived','on-hold','deliverables-completed','sent-for-approval','revisions-received','approved','deliverables-executed','invoiced'].includes(wo.stage)) {
+          dueToday.push(wo)
+        }
+      } else if (isOverdue(wo)) {
+        overdue.push(wo)
+      }
     })
     overdue.sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
     return { dueToday, overdue }
