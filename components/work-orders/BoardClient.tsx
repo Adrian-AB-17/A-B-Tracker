@@ -342,9 +342,11 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     await supabase.from('wo_schedule').delete().eq('work_order_id', wo.id)
     await supabase.from('wo_assignees').delete().eq('work_order_id', wo.id)
     await supabase.from('wo_files').delete().eq('work_order_id', wo.id)
-    const { error } = await supabase.from('work_orders').delete().eq('id', wo.id)
+    const { error, data } = await supabase.from('work_orders').delete().eq('id', wo.id).select()
     setSaving(false)
+    console.log('Delete result:', { error, data, id: wo.id })
     if (error) { alert('Delete failed: ' + error.message); return }
+    if (!data || data.length === 0) { alert('Delete failed: No rows deleted. You may not have permission.'); return }
     setWorkOrders(prev => prev.filter(w => w.id !== wo.id))
     setSelectedWo(null)
   }
