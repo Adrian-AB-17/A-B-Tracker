@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
-type Message = { role: 'user' | 'assistant'; content: string }
-type AttachedFile = { name: string; type: string; content: string; size: number }
+type Message = { role: 'user' | 'assistant'; content: string | any[] }
+type AttachedFile = { name: string; type: string; content: string; size: number; mimeType?: string }
 
 const CLIENT_KEYWORDS: Record<string, string[]> = {
   'nico-roofing':         ['nico roofing', 'nicoroofing', 'nico r'],
@@ -139,8 +139,17 @@ export default function ClaudeClient({
           reader.readAsDataURL(file)
         })
         newFiles.push({ name: file.name, type: 'excel', content, size: file.size })
+      } else if (file.type.startsWith('image/')) {
+        // Images — read as base64 for vision
+        const content = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = e => resolve((e.target?.result as string).split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+        newFiles.push({ name: file.name, type: 'image', content, size: file.size, mimeType: file.type })
       } else {
-        // Any other file type — store name and size for display, read as text if possible
+        // Any other file type — read as text if possible
         try {
           const content = await readFileAsText(file)
           newFiles.push({ name: file.name, type: 'document', content, size: file.size })
@@ -357,19 +366,29 @@ export default function ClaudeClient({
 
     // Files attached but not a report request — include file contents as context in chat
     if (attachedFiles.length > 0) {
-      const fileContext = attachedFiles
+      const images = attachedFiles.filter(f => f.type === 'image' && f.content)
+      const nonImages = attachedFiles.filter(f => f.type !== 'image')
+      const fileContext = nonImages
         .filter(f => f.content)
         .map(f => `[File: ${f.name}]\n${f.content.substring(0, 3000)}${f.content.length > 3000 ? '\n...(truncated)' : ''}`)
         .join('\n\n')
-      const fullMessage = userText
-        ? `${userText}\n\n${fileContext}`
-        : `Please review these attached files:\n\n${fileContext}`
+      const textContent = [userText, fileContext].filter(Boolean).join('\n\n') || `Please review these attached files: ${attachedFiles.map(f => f.name).join(', ')}`
+
+      // Build content array with images + text
+      const contentBlocks: any[] = [
+        ...images.map(img => ({
+          type: 'image',
+          source: { type: 'base64', media_type: img.mimeType || 'image/png', data: img.content }
+        })),
+        { type: 'text', text: textContent }
+      ]
+
       const displayMsg = userText
         ? `${userText} [+ ${attachedFiles.length} file${attachedFiles.length > 1 ? 's' : ''}]`
         : `Review: ${attachedFiles.map(f => f.name).join(', ')}`
       setInput('')
       setAttachedFiles([])
-      const newMessages: Message[] = [...messages, { role: 'user', content: fullMessage }]
+      const newMessages: Message[] = [...messages, { role: 'user', content: images.length > 0 ? contentBlocks : textContent }]
       setMessages(prev => [...prev, { role: 'user', content: displayMsg }])
       setLoading(true)
       try {
@@ -485,7 +504,7 @@ export default function ClaudeClient({
                 border: m.role === 'assistant' ? '1px solid var(--border)' : 'none',
                 fontSize: 14, lineHeight: 1.6,
               }}>
-                {m.role === 'assistant' ? renderMarkdown(m.content) : m.content}
+                {m.role === 'assistant' ? renderMarkdown(typeof m.content === 'string' ? m.content : '') : (typeof m.content === 'string' ? m.content : '[Image attached]')}
               </div>
             </div>
           ))}
