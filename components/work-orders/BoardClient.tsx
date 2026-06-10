@@ -335,13 +335,22 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
     if (!confirm(`PERMANENTLY DELETE "${wo.title}"? This cannot be undone.`)) return
     if (!confirm(`Are you absolutely sure? Type-confirm in your head: this work order will be gone forever.`)) return
     setSaving(true)
-    // Delete child records first to avoid FK constraint errors
+    // Delete ALL FK child records first
     await supabase.from('wo_line_items').delete().eq('work_order_id', wo.id)
     await supabase.from('wo_tasks').delete().eq('work_order_id', wo.id)
     await supabase.from('wo_comments').delete().eq('work_order_id', wo.id)
     await supabase.from('wo_schedule').delete().eq('work_order_id', wo.id)
+    await supabase.from('wo_schedule_items').delete().eq('work_order_id', wo.id)
     await supabase.from('wo_assignees').delete().eq('work_order_id', wo.id)
     await supabase.from('wo_files').delete().eq('work_order_id', wo.id)
+    await supabase.from('wo_links').delete().eq('work_order_id', wo.id)
+    await supabase.from('wo_message_reads').delete().eq('work_order_id', wo.id)
+    await supabase.from('wo_stage_history').delete().eq('work_order_id', wo.id)
+    await supabase.from('wo_vendor_invoices').delete().eq('work_order_id', wo.id)
+    await supabase.from('wall_posts').delete().eq('work_order_id', wo.id)
+    await supabase.from('client_comms').delete().eq('wo_id', wo.id)
+    await supabase.from('direct_messages').delete().eq('wo_id', wo.id)
+    await supabase.from('jotform_webhook_log').delete().eq('parsed_wo_id', wo.id)
     const { error, data } = await supabase.from('work_orders').delete().eq('id', wo.id).select()
     setSaving(false)
     console.log('Delete result:', { error, data, id: wo.id })
