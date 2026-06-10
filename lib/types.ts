@@ -1,7 +1,7 @@
 export type WoStage =
   | 'submitted' | 'not-started' | 'in-progress' | 'deliverables-completed'
   | 'sent-for-approval' | 'revisions-received' | 'approved'
-  | 'deliverables-executed' | 'invoiced' | 'paid' | 'on-hold' | 'archived'
+  | 'ordered' | 'deliverables-executed' | 'invoiced' | 'paid' | 'on-hold' | 'archived'
 
 export type WoOccurrence = 'One-time' | 'Recurring' | 'Quarterly' | 'Weekly'
 
@@ -13,6 +13,7 @@ export const STAGES: { id: WoStage; label: string; color: string }[] = [
   { id: 'sent-for-approval',      label: 'Sent for Approval',  color: '#7c3aed' },
   { id: 'revisions-received',     label: 'Revisions',          color: '#f59e0b' },
   { id: 'approved',               label: 'Approved',           color: '#10b981' },
+  { id: 'ordered',                label: 'Ordered',            color: '#ea580c' },
   { id: 'deliverables-executed',  label: 'Executed',           color: '#059669' },
   { id: 'invoiced',               label: 'Invoiced',           color: '#d99e2b' },
   { id: 'paid',                   label: 'Paid',               color: '#16a34a' },

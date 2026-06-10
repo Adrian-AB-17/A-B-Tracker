@@ -29,7 +29,7 @@ export default async function FinancePage() {
   const committedMrr = recurring.reduce((s, r) => s + (Number(r.amount) || 0), 0)
 
   // Active WO pipeline per client (not paid/archived)
-  const activePipelineStages = ['submitted','not-started','in-progress','deliverables-completed','sent-for-approval','revisions-received','approved','deliverables-executed','invoiced']
+  const activePipelineStages = ['submitted','not-started','in-progress','deliverables-completed','sent-for-approval','revisions-received','approved','ordered','deliverables-executed','invoiced']
   const woByClient: Record<string, number> = {}
   let totalWoPipeline = 0
   all.forEach((w: any) => {

@@ -22,7 +22,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 const BOARD_STAGES: WoStage[] = [
   'submitted','not-started','in-progress','deliverables-completed',
   'sent-for-approval','revisions-received','approved',
-  'deliverables-executed','invoiced','paid','on-hold'
+  'ordered','deliverables-executed','invoiced','paid','on-hold'
 ]
 
 type StageHistoryEntry = {

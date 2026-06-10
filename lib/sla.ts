@@ -28,6 +28,7 @@ export const STAGE_SLAS: Record<WoStage, number> = {
   'sent-for-approval': 7,
   'revisions-received': 5,
   'approved': 3,
+  'ordered': 10,
   'deliverables-executed': 5,
   'invoiced': 30,
   'paid': 999,

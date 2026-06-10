@@ -205,7 +205,7 @@ export default function InvoiceBuilder({
               )}
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3 pb-3 border-b border-gray-100">
-              {['not-started','in-progress','deliverables-completed','sent-for-approval','revisions-received','approved','deliverables-executed','invoiced'].map(stage => (
+              {['not-started','in-progress','deliverables-completed','sent-for-approval','revisions-received','approved','ordered','deliverables-executed','invoiced'].map(stage => (
                 <label key={stage} className="flex items-center gap-1.5 cursor-pointer">
                   <input type="checkbox" checked={selectedStages.has(stage)}
                     onChange={() => { setSelectedStages(prev => { const n = new Set(prev); n.has(stage) ? n.delete(stage) : n.add(stage); return n }); setSelectedWoIds(new Set()) }}

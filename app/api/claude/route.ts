@@ -144,7 +144,7 @@ const TOOLS = [
       properties: {
         wo_id: { type: 'string', description: 'Work order ID' },
         wo_title: { type: 'string', description: 'Work order title (used to find it if ID unknown)' },
-        new_stage: { type: 'string', enum: ['not-started','in-progress','deliverables-completed','sent-for-approval','revisions-received','approved','deliverables-executed','invoiced','paid'], description: 'New stage' },
+        new_stage: { type: 'string', enum: ['not-started','in-progress','deliverables-completed','sent-for-approval','revisions-received','approved','ordered','deliverables-executed','invoiced','paid'], description: 'New stage' },
       },
       required: ['new_stage'],
     },

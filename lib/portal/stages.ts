@@ -13,6 +13,7 @@ export const STAGE_VIEW: Record<string, StageView> = {
   'sent-for-approval':      { label: 'Awaiting your approval', color: '#ea580c', dot: '#ea580c' },
   'revisions-received':     { label: 'In revisions',           color: '#ec4899', dot: '#ec4899' },
   'approved':               { label: 'Approved',               color: '#15803d', dot: '#15803d' },
+  'ordered':                { label: 'Items ordered',          color: '#ea580c', dot: '#ea580c' },
   'deliverables-executed':  { label: 'In production',          color: '#15803d', dot: '#15803d' },
   'invoiced':               { label: 'Invoiced',               color: '#2563eb', dot: '#2563eb' },
   'paid':                   { label: 'Completed',              color: '#15803d', dot: '#15803d' },
