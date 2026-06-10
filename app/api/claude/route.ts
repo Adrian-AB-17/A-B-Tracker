@@ -186,6 +186,7 @@ const TOOLS = [
         service_name: { type: 'string', description: 'Service name e.g. Design, Video Production' },
         due_date: { type: 'string', description: 'Due date in YYYY-MM-DD format' },
         owner_name: { type: 'string', description: 'Name of the team member to assign as owner' },
+        assignee_names: { type: 'array', items: { type: 'string' }, description: 'Names of team members to assign to this WO (e.g. ["Majo", "Pau"])' },
         priority: { type: 'string', enum: ['low', 'medium', 'high', 'urgent'], description: 'Priority level' },
         notes: { type: 'string', description: 'Internal notes for the work order' },
       },
@@ -390,6 +391,28 @@ async function executeTool(name: string, input: any, level: string, authUserId: 
         updated_at: new Date().toISOString(),
       })
       if (error) return 'Error creating WO: ' + error.message
+
+      // Insert assignees if provided
+      if (input.assignee_names?.length) {
+        for (const aname of input.assignee_names) {
+          const { data: assignee } = await supabaseAdmin.from('team_members').select('id, auth_user_id').ilike('name', '%' + aname + '%').maybeSingle()
+          if (assignee) {
+            await supabaseAdmin.from('wo_assignees').insert({ work_order_id: woId, team_member_id: assignee.id })
+            // Notify assignee
+            if (assignee.auth_user_id) {
+              const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.abconsultingg.com'
+              await fetch(`${appUrl}/api/notify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  notifications: [{ user_id: assignee.auth_user_id, type: 'assignment' }],
+                  wo_title: input.title, wo_id: woId, sender_name: 'Pancho',
+                }),
+              }).catch(() => {})
+            }
+          }
+        }
+      }
 
       // Notify Tanya of new WO
       try {
