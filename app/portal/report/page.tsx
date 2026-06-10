@@ -56,7 +56,7 @@ export default async function PortalReportPage({
   ] = await Promise.all([
     supabase
       .from('client_reports')
-      .select('narrative, status, narrative_generated_at')
+      .select('narrative, status, narrative_generated_at, highlights')
       .eq('client_id', clientId)
       .eq('month', month)
       .eq('status', 'ready')
@@ -110,6 +110,29 @@ export default async function PortalReportPage({
         <div style={{ background: '#fef9c3', border: '1px solid #fef08a', borderRadius: 12,
                       padding: '20px 24px', marginBottom: 24, fontSize: 14, color: '#854d0e' }}>
           Your {monthLabel(month)} report is being prepared by the A&B team and will be available here soon.
+        </div>
+      )}
+
+      {/* 3 Wins */}
+      {report && (report as any).highlights?.filter((h: string) => h?.trim()).length > 0 && (
+        <div style={{ background: 'white', border: '2px solid #10b981', borderRadius: 12,
+                      padding: 24, marginBottom: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px',
+                        color: '#10b981', marginBottom: 16 }}>
+            🏆 3 wins this month
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {((report as any).highlights as string[]).filter((h: string) => h?.trim()).map((win: string, i: number) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ width: 24, height: 24, borderRadius: '50%', background: '#d1fae5',
+                               display: 'flex', alignItems: 'center', justifyContent: 'center',
+                               fontSize: 12, fontWeight: 700, color: '#059669', flexShrink: 0, marginTop: 1 }}>
+                  {i + 1}
+                </div>
+                <p style={{ fontSize: 14, lineHeight: 1.6, color: '#374151', margin: 0 }}>{win}</p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

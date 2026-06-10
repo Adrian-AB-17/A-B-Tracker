@@ -25,6 +25,7 @@ type Report = {
   status: string
   narrative: string | null
   narrative_generated_at: string | null
+  highlights: string[] | null
 } | null
 
 interface Props {
@@ -76,6 +77,45 @@ export default function ReportDashboard({
   const [claudeQuery, setClaudeQuery] = useState('')
   const [claudeResponse, setClaudeResponse] = useState('')
   const [claudeLoading, setClaudeLoading] = useState(false)
+  const [highlights, setHighlights] = useState<string[]>(report?.highlights || ['', '', ''])
+  const [generatingHighlights, setGeneratingHighlights] = useState(false)
+  const [savingHighlights, setSavingHighlights] = useState(false)
+
+  async function generateHighlights() {
+    setGeneratingHighlights(true)
+    const summary = reportData.map(r => `${r.section} / ${r.platform} / ${r.metric}: ${r.value}`).join('\n')
+    try {
+      const res = await fetch('/api/reports/narrative', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId, clientName, month: monthLabel(month), summary,
+          question: 'List exactly 3 positive highlights from this month in plain language a client would understand. Each highlight should be one sentence, specific, and start with a number or metric where possible. Return ONLY a JSON array of 3 strings, nothing else. Example: ["Impressions grew 24% to 45,000 this month", "Your Facebook engagement rate outperformed the industry average", "3 new followers gained on LinkedIn"]',
+        }),
+      })
+      if (!res.ok) throw new Error('API error')
+      const { narrative: raw } = await res.json()
+      const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim())
+      if (Array.isArray(parsed) && parsed.length >= 3) {
+        const wins = parsed.slice(0, 3).map((s: unknown) => String(s))
+        setHighlights(wins)
+        await supabase.from('client_reports').upsert({
+          client_id: clientId, month, status: report?.status || 'draft',
+          highlights: wins,
+        }, { onConflict: 'client_id,month' })
+      }
+    } catch { /* fail silently */ }
+    setGeneratingHighlights(false)
+  }
+
+  async function saveHighlights() {
+    setSavingHighlights(true)
+    await supabase.from('client_reports').upsert({
+      client_id: clientId, month, status: report?.status || 'draft',
+      highlights,
+    }, { onConflict: 'client_id,month' })
+    setSavingHighlights(false)
+  }
 
   // ── Aggregate metrics from report_data ──────────────────────────────────
   const metrics = useMemo(() => {
@@ -303,6 +343,56 @@ export default function ReportDashboard({
             ) : (
               <NoData message="No data uploaded yet." action={`Upload files at /reports/upload`} />
             )}
+
+            {/* 3 Wins This Month */}
+            <div className="rounded-xl border-2 p-5"
+              style={{ background: 'var(--bg-elevated)', borderColor: clientColor + '40' }}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🏆</span>
+                  <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>3 wins this month</span>
+                  <span className="text-xs px-2 py-0.5 rounded" style={{ background: clientColor + '15', color: clientColor }}>
+                    Client-facing
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={saveHighlights} disabled={savingHighlights}
+                    className="text-xs px-3 py-1 rounded font-semibold disabled:opacity-40"
+                    style={{ background: 'var(--bg)', border: '0.5px solid var(--border)', color: 'var(--text)' }}>
+                    {savingHighlights ? 'Saving…' : 'Save'}
+                  </button>
+                  <button onClick={generateHighlights} disabled={generatingHighlights || !hasData}
+                    className="text-xs px-3 py-1 rounded font-semibold disabled:opacity-40"
+                    style={{ background: clientColor, color: 'white' }}>
+                    {generatingHighlights ? 'Generating…' : highlights.some(h => h) ? '↺ Regenerate' : '✦ Auto-generate'}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                      style={{ background: clientColor + '20', color: clientColor }}>{i + 1}</div>
+                    <input
+                      type="text"
+                      value={highlights[i] || ''}
+                      onChange={e => {
+                        const next = [...highlights]
+                        next[i] = e.target.value
+                        setHighlights(next)
+                      }}
+                      onBlur={saveHighlights}
+                      placeholder={`Win #${i + 1} — e.g. "Impressions grew 24% to 45,000 this month"`}
+                      className="flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none"
+                      style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
+                    />
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
+                These 3 wins appear at the top of the client portal report. Edit freely — auto-save on blur.
+              </p>
+            </div>
 
             {/* AI Narrative */}
             <div className="rounded-xl border p-5"
