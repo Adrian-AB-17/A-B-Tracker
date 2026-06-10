@@ -53,7 +53,7 @@ export default function DmsClient({
   }
 
   function memberName(id: string | null) {
-    if (!id) return '✦ Mav'
+    if (!id) return '✦ Pancho'
     return team.find(t => t.id === id)?.name || 'Someone'
   }
 
@@ -70,14 +70,14 @@ export default function DmsClient({
         <div className="text-center py-16 text-gray-400">
           <div className="text-4xl mb-3">✦</div>
           <div className="text-sm">No direct messages yet.</div>
-          <div className="text-xs mt-1">Ask Mav to send you something — try "send me a summary of overdue WOs"</div>
+          <div className="text-xs mt-1">Ask Pancho to send you something — try "send me a summary of overdue WOs"</div>
         </div>
       ) : (
         <div className="space-y-3">
           {dms.map(dm => {
             const isToMe = dm.to_member_id === currentMemberId
             const isUnread = isToMe && !dm.read_at
-            const fromName = dm.sent_via === 'mav' && !dm.from_member_id ? '✦ Mav' : memberName(dm.from_member_id)
+            const fromName = dm.sent_via === 'mav' && !dm.from_member_id ? '✦ Pancho' : memberName(dm.from_member_id)
             const toName = memberName(dm.to_member_id)
             return (
               <div key={dm.id}
@@ -91,7 +91,7 @@ export default function DmsClient({
                         <span className="text-xs bg-blue-500 text-white rounded-full px-1.5 py-0.5 font-medium">New</span>
                       )}
                       {dm.sent_via === 'mav' && (
-                        <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-1.5 py-0.5">via Mav</span>
+                        <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-full px-1.5 py-0.5">via Pancho</span>
                       )}
                       <span className="text-xs text-gray-400 ml-auto">{timeAgo(dm.created_at)}</span>
                     </div>

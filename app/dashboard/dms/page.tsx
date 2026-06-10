@@ -32,8 +32,8 @@ export default async function DmsPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">✦ Mav Direct</h1>
-        <p className="text-sm text-gray-500 mt-1">Private messages from Mav and your team</p>
+        <h1 className="text-2xl font-bold text-gray-900">✦ Pancho Direct</h1>
+        <p className="text-sm text-gray-500 mt-1">Private messages from Pancho and your team</p>
       </div>
       <DmsClient
         initialDms={dms || []}

@@ -26,7 +26,7 @@ const NAV: NavItem[] = [
   { href: '/dashboard/tasks',     label: 'My Tasks',        icon: '✓', countKey: 'myTasks',  section: 'filters' },
   { href: '/dashboard/tasks/all', label: 'All Tasks',       icon: '✓✓', section: 'filters' },
   { href: '/dashboard/messages',  label: 'Messages',        icon: '💬', section: 'filters' },
-  { href: '/dashboard/claude', label: 'Mav', icon: '✦', section: 'filters' },
+  { href: '/dashboard/claude', label: 'Pancho', icon: '✦', section: 'filters' },
   { href: '/reports', label: 'Reports', icon: '📈', adminOnly: true, section: 'filters' },
   { href: '/dashboard/mentions',  label: 'My Mentions',     icon: '@', section: 'filters' },
   { href: '/dashboard/recent',    label: 'Recent Changes',  icon: '🔔', section: 'filters' },
@@ -35,7 +35,7 @@ const NAV: NavItem[] = [
 // HQ sub-navigation
 const HQ_ITEMS = [
   { href: '/dashboard/standup?channel=general', label: 'Wall',       icon: '☀️', adminOnly: false },
-  { href: '/dashboard/dms',                     label: 'Mav Direct', icon: '✦',  adminOnly: false },
+  { href: '/dashboard/dms',                     label: 'Pancho Direct', icon: '✦',  adminOnly: false },
   { href: '/dashboard/comms',                   label: 'Comms',      icon: '📨', adminOnly: true  },
   { href: '/dashboard/meetings',                label: 'Meetings',   icon: '📋', adminOnly: false },
 ]

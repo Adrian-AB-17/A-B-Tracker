@@ -449,7 +449,7 @@ export default function ClaudeClient({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 24 }}>✦</span>
           <div>
-            <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: 22, color: 'var(--text)', margin: 0 }}>Mav</h1>
+            <h1 style={{ fontFamily: 'Fraunces, serif', fontSize: 22, color: 'var(--text)', margin: 0 }}>Pancho</h1>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Your A&B ops co-pilot — ask anything, drop files, get things done · Drop Sprout CSVs to process monthly reports</p>
           </div>
         </div>
