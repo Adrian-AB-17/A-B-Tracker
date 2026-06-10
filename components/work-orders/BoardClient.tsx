@@ -247,7 +247,7 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
 
   const filtered = useMemo(() => {
     return workOrders.filter(wo => {
-      if (search && !wo.title.toLowerCase().includes(search.toLowerCase())) return false
+      if (search && !wo.title.toLowerCase().includes(search.toLowerCase()) && !wo.id.toLowerCase().includes(search.toLowerCase())) return false
       if (filterClient && wo.client_id !== filterClient) return false
       if (filterService && wo.service_id !== filterService) return false
       if (filterOwner && wo.owner_id !== filterOwner) return false
