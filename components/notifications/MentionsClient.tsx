@@ -80,7 +80,7 @@ export default function MentionsClient({ initial }: { initial: Notification[] })
           </div>
         ) : filtered.map(n => (
           <a key={n.id} href={n.link_url || '/dashboard'}
-            onClick={() => !n.read_at && markAsRead(n.id)}
+            onClick={(e) => { if (!n.read_at) { e.preventDefault(); markAsRead(n.id).then(() => { window.location.href = n.link_url || "/dashboard" }) } }}
             className={`block p-4 hover:bg-blue-50 transition-colors relative ${!n.read_at ? 'bg-blue-50/30' : ''}`}>
             {!n.read_at && <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-blue-500" />}
             <div className="flex items-start gap-3 ml-3">

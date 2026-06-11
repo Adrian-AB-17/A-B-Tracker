@@ -13,10 +13,10 @@ export default async function MentionsPage() {
 
   const { data: notifications } = await supabase
     .from('wo_notifications')
-    .select('*')
+    .select('id, source_type, source_id, work_order_id, body_preview, author_name, link_url, read_at, created_at')
     .eq('user_id', user.user.id)
     .order('created_at', { ascending: false })
-    .limit(200)
+    .limit(50)
 
   return <MentionsClient initial={notifications || []} />
 }
