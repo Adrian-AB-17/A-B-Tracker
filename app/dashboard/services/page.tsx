@@ -42,7 +42,7 @@ export default async function ServicesPage({
 
   const { data: clients } = await supabase
     .from('clients')
-    .select('id, name')
+    .select('id, name').eq('status', 'active')
     .order('name', { ascending: true })
 
   // ── Print Pricing data ───────────────────────────────────────────────────

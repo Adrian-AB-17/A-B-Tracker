@@ -12,7 +12,7 @@ export default async function AllWorkOrdersPage() {
     .order('created_at', { ascending: false })
     .limit(2000)
 
-  const { data: clients } = await supabase.from('clients').select('id, name').order('name')
+  const { data: clients } = await supabase.from('clients').select('id, name').eq('status', 'active').order('name')
   const { data: services } = await supabase.from('services').select('id, name').order('name')
   const { data: team } = await supabase.from('team_members').select('id, name').order('name')
 

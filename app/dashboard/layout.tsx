@@ -131,7 +131,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // ----- Clients section: each active client with WO count -----
   const { data: allClients } = await supabase
     .from('clients')
-    .select('id, name')
+    .select('id, name').eq('status', 'active')
     .order('name')
 
   const { data: woClientPairs } = await supabase

@@ -28,13 +28,13 @@ export default async function AllTasksPage() {
   // Fetch team list for the assignee filter dropdown
   const { data: allTeam } = await supabase
     .from('team_members')
-    .select('id, name')
+    .select('id, name').eq('status', 'active')
     .order('name')
 
   // Distinct client list for the client filter dropdown
   const { data: allClients } = await supabase
     .from('clients')
-    .select('id, name')
+    .select('id, name').eq('status', 'active')
     .order('name')
 
   return (

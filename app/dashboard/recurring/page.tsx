@@ -8,7 +8,7 @@ export default async function RecurringPage() {
       .from('recurring_services')
       .select('id, client_id, label, amount, is_bundle, coverage_notes, active, start_date')
       .order('active', { ascending: false }),
-    supabase.from('clients').select('id, name').order('name'),
+    supabase.from('clients').select('id, name').eq('status', 'active').order('name'),
   ])
 
   return (

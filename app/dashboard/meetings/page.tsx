@@ -17,7 +17,7 @@ export default async function MeetingsPage() {
 
   const { data: clients } = await supabase
     .from('clients')
-    .select('id, name')
+    .select('id, name').eq('status', 'active')
     .eq('status', 'active')
     .order('name')
 

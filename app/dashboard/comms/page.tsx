@@ -11,7 +11,7 @@ export default async function CommsPage() {
       .select('*')
       .order('sent_at', { ascending: false })
       .limit(200),
-    supabase.from('clients').select('id, name').order('name'),
+    supabase.from('clients').select('id, name').eq('status', 'active').order('name'),
     supabase
       .from('work_orders')
       .select('id, title, client_id')
