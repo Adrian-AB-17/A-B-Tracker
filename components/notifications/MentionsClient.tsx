@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Notification = {
@@ -17,7 +17,17 @@ type Notification = {
 export default function MentionsClient({ initial }: { initial: Notification[] }) {
   const [notifications, setNotifications] = useState<Notification[]>(initial)
   const [filter, setFilter] = useState<'all' | 'unread'>('unread')
+  const [loading, setLoading] = useState(initial.length === 0)
   const supabase = createClient()
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase.from('wo_notifications').select('id, source_type, source_id, work_order_id, body_preview, author_name, link_url, read_at, created_at').order('created_at', { ascending: false }).limit(50)
+      if (data) setNotifications(data)
+      setLoading(false)
+    }
+    load()
+  }, [])
 
   function relativeTime(iso: string) {
     const diff = Date.now() - new Date(iso).getTime()
@@ -74,13 +84,15 @@ export default function MentionsClient({ initial }: { initial: Notification[] })
       </div>
 
       <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-50">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="text-center text-gray-400 py-12 text-sm">Loading...</div>
+        ) : filtered.length === 0 ? (
           <div className="text-center text-gray-400 py-12 text-sm">
             {filter === 'unread' ? 'No unread mentions' : 'No mentions yet'}
           </div>
         ) : filtered.map(n => (
           <a key={n.id} href={n.link_url || '/dashboard'}
-            onClick={(e) => { if (!n.read_at) { e.preventDefault(); markAsRead(n.id).then(() => { window.location.href = n.link_url || "/dashboard" }) } }}
+            onClick={() => { if (!n.read_at) markAsRead(n.id) }}
             className={`block p-4 hover:bg-blue-50 transition-colors relative ${!n.read_at ? 'bg-blue-50/30' : ''}`}>
             {!n.read_at && <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-blue-500" />}
             <div className="flex items-start gap-3 ml-3">
