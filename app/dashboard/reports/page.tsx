@@ -238,7 +238,8 @@ function GAdsSection({ ch }: { ch: ChannelData | null }) {
         : (
           <>
             <TileGrid>
-              <Tile label="Spend" value={money(d.spend)} />
+              <Tile label="Raw Spend" value={money(d.spend)} sub="billed to Google" />
+              <Tile label="Billed to Client" value={money(d.billedSpend)} sub={d.markupPct > 0 ? `${d.markupPct}% markup` : 'no markup'} hi={d.markupPct > 0 ? 'good' : null} />
               <Tile label="Impressions" value={fmt(d.impressions)} />
               <Tile label="Clicks" value={fmt(d.clicks)} />
               <Tile label="CTR" value={pct(d.ctr)} />
@@ -250,8 +251,8 @@ function GAdsSection({ ch }: { ch: ChannelData | null }) {
             </TileGrid>
             {d.campaigns?.length > 0 && (
               <MiniTable
-                cols={['Campaign', 'Spend', 'Clicks', 'CTR', 'Conv.']}
-                rows={d.campaigns.map((c: { name: string; cost: number; clicks: number; ctr: number; conversions: number }) => [c.name, money(c.cost), fmt(c.clicks), pct(c.ctr), fmt(c.conversions)])}
+                cols={['Campaign', 'Account', 'Spend', 'Clicks', 'CTR', 'Conv.']}
+                rows={d.campaigns.map((c: { name: string; account: string; cost: number; clicks: number; ctr: number; conversions: number }) => [c.name, c.account, money(c.cost), fmt(c.clicks), pct(c.ctr), fmt(c.conversions)])}
               />
             )}
           </>
