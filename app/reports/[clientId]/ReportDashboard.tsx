@@ -462,9 +462,31 @@ export default function ReportDashboard({
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
-                {monthLabel(month)} Report
-              </h1>
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>
+                  {monthLabel(month)} Report
+                </h1>
+                <select
+                  value={month}
+                  onChange={e => {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('month', e.target.value);
+                    window.location.href = url.toString();
+                  }}
+                  style={{
+                    fontSize: 12, padding: '4px 10px', border: '1px solid var(--border)',
+                    borderRadius: 7, background: 'var(--bg-elevated)', color: 'var(--brand-navy)',
+                    fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {Array.from({ length: 6 }, (_, i) => {
+                    const d = new Date();
+                    d.setMonth(d.getMonth() - i);
+                    const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                    return <option key={val} value={val}>{d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>;
+                  })}
+                </select>
+              </div>
               <div className="flex items-center gap-3 mt-1">
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                   approved ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
