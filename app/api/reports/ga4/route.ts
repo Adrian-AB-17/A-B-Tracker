@@ -162,3 +162,84 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const clientId = searchParams.get('clientId');
+  const month = searchParams.get('month') || new Date().toISOString().slice(0, 7);
+  if (!clientId || !month) return NextResponse.json({ error: 'clientId and month required' }, { status: 400 });
+
+  const propertyId = GA4_PROPERTIES[clientId];
+  if (!propertyId) return NextResponse.json({ configured: false, message: `No GA4 property configured for ${clientId}`, data: null });
+
+  try {
+    // First try to read cached data from report_data
+    const { data: cached } = await supabase
+      .from('report_data')
+      .select('metric, value')
+      .eq('client_id', clientId)
+      .eq('month', month)
+      .eq('platform', 'ga4');
+
+    if (cached && cached.length > 0) {
+      const get = (m: string) => cached.find(r => r.metric === m)?.value || 0;
+      const channels = cached
+        .filter(r => r.metric.startsWith('channel__'))
+        .map(r => ({
+          channel: r.metric.replace('channel__', '').replace(/__sessions$/, '').replace(/_/g, ' '),
+          sessions: r.value,
+        }))
+        .sort((a, b) => b.sessions - a.sessions);
+      return NextResponse.json({
+        configured: true, clientId, month,
+        data: {
+          sessions:            get('sessions'),
+          users:               get('total_users'),
+          newUsers:            get('new_users'),
+          bounceRate:          get('bounce_rate') * 100,
+          avgSessionDuration:  get('avg_session_duration_sec'),
+          pageViews:           get('page_views'),
+          conversions:         get('conversions'),
+          topChannel:          channels[0]?.channel || null,
+          channels,
+        },
+      });
+    }
+
+    // No cached data — fetch live from GA4 and store
+    const token = await getAccessToken();
+    const [overview, channelsData] = await Promise.all([
+      fetchGA4Metrics(propertyId, token,
+        `${month}-01`,
+        `${month}-${new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate()}`
+      ),
+      fetchGA4ChannelBreakdown(propertyId, token,
+        `${month}-01`,
+        `${month}-${new Date(parseInt(month.split('-')[0]), parseInt(month.split('-')[1]), 0).getDate()}`
+      ),
+    ]);
+
+    const row = overview.rows?.[0]?.metricValues || [];
+    return NextResponse.json({
+      configured: true, clientId, month,
+      data: {
+        sessions:           parseFloat(row[0]?.value || '0'),
+        users:              parseFloat(row[1]?.value || '0'),
+        newUsers:           parseFloat(row[2]?.value || '0'),
+        bounceRate:         parseFloat(row[3]?.value || '0') * 100,
+        avgSessionDuration: parseFloat(row[4]?.value || '0'),
+        pageViews:          parseFloat(row[5]?.value || '0'),
+        conversions:        parseFloat(row[6]?.value || '0'),
+        topChannel: channelsData.rows?.[0]?.dimensionValues?.[0]?.value || null,
+        channels: (channelsData.rows || []).map((r: any) => ({
+          channel: r.dimensionValues?.[0]?.value,
+          sessions: parseFloat(r.metricValues?.[0]?.value || '0'),
+        })),
+      },
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[GA4 GET]', msg);
+    return NextResponse.json({ error: msg, configured: true, data: null }, { status: 500 });
+  }
+}
