@@ -91,6 +91,18 @@ export default async function PortalReportPage({
   const hasData = (reportData || []).length > 0
   const clientName = client?.name || clientId
 
+  // Fetch approved channels
+  const { data: approvals } = await supabase
+    .from('client_report_approvals')
+    .select('channel, approved, notes')
+    .eq('client_id', clientId)
+    .eq('month', month)
+    .eq('approved', true);
+
+  const approvedChannels = new Set((approvals || []).map((a: { channel: string }) => a.channel));
+  const approvalNotes: Record<string, string> = {};
+  (approvals || []).forEach((a: { channel: string; notes: string }) => { approvalNotes[a.channel] = a.notes || ''; });
+
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: '32px 24px' }}>
 
@@ -130,6 +142,32 @@ export default async function PortalReportPage({
                   {i + 1}
                 </div>
                 <p style={{ fontSize: 14, lineHeight: 1.6, color: '#374151', margin: 0 }}>{win}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Live Channel Data */}
+      {approvedChannels.size > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1a2744', marginBottom: 12 }}>⚡ Live Performance Data</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { id: 'gmb',    icon: '⭐', label: 'Reputation Management' },
+              { id: 'meta',   icon: '📘', label: 'Meta Ads' },
+              { id: 'gads',   icon: '🔵', label: 'Google Ads' },
+              { id: 'ga4',    icon: '📊', label: 'Website Performance' },
+              { id: 'social', icon: '🌱', label: 'Social Media' },
+              { id: 'email',  icon: '✉️',  label: 'Email Marketing' },
+            ].filter(ch => approvedChannels.has(ch.id)).map(ch => (
+              <div key={ch.id} style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: '14px 16px', background: '#fff' }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: '#1a2744', marginBottom: approvalNotes[ch.id] ? 6 : 0 }}>
+                  {ch.icon} {ch.label}
+                </div>
+                {approvalNotes[ch.id] && (
+                  <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.5 }}>{approvalNotes[ch.id]}</p>
+                )}
               </div>
             ))}
           </div>

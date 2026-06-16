@@ -1,7 +1,201 @@
 'use client'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+
+// ─── Live Data Tab ────────────────────────────────────────────────────────────
+
+const CHANNEL_META = [
+  { id: 'gmb',    icon: '⭐', label: 'Reputation' },
+  { id: 'meta',   icon: '📘', label: 'Meta Ads' },
+  { id: 'gads',   icon: '🔵', label: 'Google Ads' },
+  { id: 'ga4',    icon: '📊', label: 'Website (GA4)' },
+  { id: 'social', icon: '🌱', label: 'Social' },
+  { id: 'email',  icon: '✉️', label: 'Email' },
+] as const;
+
+type ChannelId = typeof CHANNEL_META[number]['id'];
+
+interface Approval {
+  approved: boolean;
+  notes: string;
+  approved_by: string | null;
+  approved_at: string | null;
+}
+
+function LiveDataTab({ clientId, month }: { clientId: string; month: string }) {
+  const [approvals, setApprovals] = useState<Record<string, Approval>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
+  const [loadingApprovals, setLoadingApprovals] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/reports/approve?clientId=${clientId}&month=${month}`)
+      .then(r => r.json())
+      .then(d => {
+        setApprovals(d.approvals || {});
+        const notes: Record<string, string> = {};
+        Object.entries(d.approvals || {}).forEach(([ch, a]) => {
+          notes[ch] = (a as Approval).notes || '';
+        });
+        setEditingNotes(notes);
+      })
+      .finally(() => setLoadingApprovals(false));
+  }, [clientId, month]);
+
+  const toggleApproval = async (channel: ChannelId) => {
+    const current = approvals[channel];
+    const newApproved = !current?.approved;
+    setSaving(prev => ({ ...prev, [channel]: true }));
+
+    const res = await fetch('/api/reports/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId, month, channel,
+        approved: newApproved,
+        notes: editingNotes[channel] || '',
+      }),
+    });
+
+    if (res.ok) {
+      setApprovals(prev => ({
+        ...prev,
+        [channel]: {
+          ...prev[channel],
+          approved: newApproved,
+          approved_at: newApproved ? new Date().toISOString() : null,
+        },
+      }));
+    }
+    setSaving(prev => ({ ...prev, [channel]: false }));
+  };
+
+  const saveNotes = async (channel: ChannelId) => {
+    setSaving(prev => ({ ...prev, [`notes_${channel}`]: true }));
+    await fetch('/api/reports/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId, month, channel,
+        approved: approvals[channel]?.approved || false,
+        notes: editingNotes[channel] || '',
+      }),
+    });
+    setApprovals(prev => ({
+      ...prev,
+      [channel]: { ...prev[channel], notes: editingNotes[channel] || '' },
+    }));
+    setSaving(prev => ({ ...prev, [`notes_${channel}`]: false }));
+  };
+
+  const approvedCount = CHANNEL_META.filter(c => approvals[c.id]?.approved).length;
+
+  if (loadingApprovals) {
+    return <div style={{ padding: '32px 0', color: 'var(--text-muted)', fontSize: 14 }}>Loading approvals…</div>;
+  }
+
+  return (
+    <div>
+      {/* Status bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        marginBottom: 20, padding: '12px 16px',
+        background: approvedCount === CHANNEL_META.length ? '#f0fdf4' : 'var(--bg-sunken)',
+        border: `1px solid ${approvedCount === CHANNEL_META.length ? '#86efac' : 'var(--border)'}`,
+        borderRadius: 10,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--brand-navy)' }}>
+          {approvedCount}/{CHANNEL_META.length} channels approved
+        </div>
+        {approvedCount > 0 && (
+          <a
+            href={`/dashboard/reports`}
+            style={{ fontSize: 12, color: '#16a34a', fontWeight: 600, textDecoration: 'none' }}
+          >
+            ✓ {approvedCount} published to client portal
+          </a>
+        )}
+      </div>
+
+      {/* Channel approval rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {CHANNEL_META.map(ch => {
+          const approval = approvals[ch.id];
+          const isApproved = approval?.approved || false;
+          const isSaving = saving[ch.id];
+
+          return (
+            <div key={ch.id} style={{
+              border: `1px solid ${isApproved ? '#86efac' : 'var(--border)'}`,
+              borderRadius: 10,
+              padding: '14px 16px',
+              background: isApproved ? '#f0fdf4' : 'var(--bg-elevated)',
+              transition: 'all 0.15s',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 16 }}>{ch.icon}</span>
+                <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--brand-navy)', flex: 1 }}>{ch.label}</span>
+
+                {isApproved && approval?.approved_at && (
+                  <span style={{ fontSize: 11, color: '#16a34a' }}>
+                    Approved {new Date(approval.approved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    {approval.approved_by ? ` by ${approval.approved_by.split('@')[0]}` : ''}
+                  </span>
+                )}
+
+                <button
+                  onClick={() => toggleApproval(ch.id)}
+                  disabled={isSaving}
+                  style={{
+                    fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 7,
+                    border: `1px solid ${isApproved ? '#16a34a' : 'var(--border)'}`,
+                    background: isApproved ? '#16a34a' : 'transparent',
+                    color: isApproved ? '#fff' : 'var(--text-muted)',
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.15s',
+                    opacity: isSaving ? 0.6 : 1,
+                  }}
+                >
+                  {isSaving ? '…' : isApproved ? '✓ Approved' : 'Approve'}
+                </button>
+              </div>
+
+              {/* Notes field */}
+              <div style={{ marginTop: 10 }}>
+                <textarea
+                  value={editingNotes[ch.id] || ''}
+                  onChange={e => setEditingNotes(prev => ({ ...prev, [ch.id]: e.target.value }))}
+                  placeholder={`Add notes for ${ch.label} — shown to client after approval`}
+                  rows={2}
+                  style={{
+                    width: '100%', fontSize: 12, padding: '8px 10px',
+                    border: '1px solid var(--border)', borderRadius: 7,
+                    background: 'var(--bg)', color: 'var(--text)',
+                    resize: 'vertical', fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                  }}
+                  onBlur={() => {
+                    if ((editingNotes[ch.id] || '') !== (approval?.notes || '')) {
+                      saveNotes(ch.id);
+                    }
+                  }}
+                />
+                {saving[`notes_${ch.id}`] && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>Saving…</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--bg-sunken)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+        💡 Approved channels appear in the client portal under "Live Data". Notes are visible to the client. Markup and billing details are always hidden.
+      </div>
+    </div>
+  );
+}
 
 type ReportData = {
   id: string
@@ -60,7 +254,7 @@ function pct(n: number | null | undefined) {
   return `${n.toFixed(2)}%`
 }
 
-type TabId = 'social' | 'meta' | 'google' | 'website' | 'email' | 'overview'
+type TabId = 'social' | 'meta' | 'google' | 'website' | 'email' | 'overview' | 'live'
 
 export default function ReportDashboard({
   clientId, clientName, clientInitials, clientColor,
@@ -240,12 +434,13 @@ export default function ReportDashboard({
   }
 
   const TABS: { id: TabId; label: string; icon: string }[] = [
-    { id: 'overview', label: 'Overview', icon: '📊' },
-    { id: 'social',   label: 'Social',   icon: '📱' },
-    { id: 'meta',     label: 'Meta Ads', icon: '🎯' },
+    { id: 'overview', label: 'Overview',   icon: '📊' },
+    { id: 'live',     label: 'Live Data',  icon: '⚡' },
+    { id: 'social',   label: 'Social',     icon: '📱' },
+    { id: 'meta',     label: 'Meta Ads',   icon: '🎯' },
     { id: 'google',   label: 'Google Ads', icon: '🔍' },
-    { id: 'website',  label: 'Website',  icon: '🌐' },
-    { id: 'email',    label: 'Email',    icon: '📧' },
+    { id: 'website',  label: 'Website',    icon: '🌐' },
+    { id: 'email',    label: 'Email',      icon: '📧' },
   ]
 
   return (
@@ -627,6 +822,10 @@ export default function ReportDashboard({
         )}
 
         {/* ── EMAIL ───────────────────────────────────────────────────────── */}
+        {tab === 'live' && (
+          <LiveDataTab clientId={clientId} month={month} />
+        )}
+
         {tab === 'email' && (
           <PendingSection
             title="Email Marketing"
