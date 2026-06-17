@@ -17,6 +17,8 @@ function getUserLevel(authUserId: string, role: string): 'owner' | 'admin' | 'te
 async function buildContext(level: 'owner' | 'admin' | 'team', authUserId: string, memberName: string) {
   const now = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
+  const today = new Date().toISOString().slice(0, 10)
+
   const { data: wos } = await supabaseAdmin
     .from('work_orders')
     .select(`id, title, stage, client_id, est_cost, add_cost, due_date, priority, created_at,
@@ -28,6 +30,15 @@ async function buildContext(level: 'owner' | 'admin' | 'team', authUserId: strin
     .not('stage', 'in', '(archived,paid)')
     .order('created_at', { ascending: false })
     .limit(500)
+
+  // Load all open tasks with due dates
+  const { data: allTasks } = await supabaseAdmin
+    .from('wo_tasks')
+    .select('id, title, status, due_date, priority, work_order_id, work_orders!wo_tasks_work_order_id_fkey(title, client_id, clients!work_orders_client_id_fkey(name), team_members!work_orders_owner_id_fkey(name, auth_user_id))')
+    .not('status', 'eq', 'done')
+    .not('work_orders.stage', 'in', '(archived,paid)')
+    .order('due_date', { ascending: true })
+    .limit(300)
 
   const { data: team } = await supabaseAdmin
     .from('team_members')
@@ -71,7 +82,7 @@ async function buildContext(level: 'owner' | 'admin' | 'team', authUserId: strin
 
   const teamList = (team || []).map((t: any) => '- ' + t.name + ' (' + t.role + ')').join('\n')
 
-  const woList = filteredWos.slice(0, 50).map((w: any) => {
+  const woList = filteredWos.slice(0, 200).map((w: any) => {
     const assigneeNames = (w.wo_assignees || []).map((a: any) => a.team_members?.name).filter(Boolean).join(', ')
     const scheduleItems = (w.wo_schedule || [])
       .sort((a: any, b: any) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime())
@@ -162,13 +173,60 @@ async function buildContext(level: 'owner' | 'admin' | 'team', authUserId: strin
     context += '\n\nRECENT CLIENT COMMS (last 30 days):\n' + commsList
   }
 
+  // Daily rundown — WOs due today or overdue (approved stage)
+  const overdueApproved = filteredWos.filter((w: any) =>
+    w.due_date && w.due_date < today && w.stage === 'approved'
+  )
+  const dueToday = filteredWos.filter((w: any) => w.due_date === today)
+
+  if (overdueApproved.length > 0) {
+    const lines = overdueApproved.map((w: any) =>
+      '  - [OVERDUE] ' + w.title + ' | ' + (w.clients?.name || '?') + ' | Due: ' + w.due_date + ' | Owner: ' + (w.team_members?.name || 'unassigned')
+    ).join('\n')
+    context += '\n\nOVERDUE APPROVED WOs (need action NOW):\n' + lines
+  }
+
+  if (dueToday.length > 0) {
+    const lines = dueToday.map((w: any) =>
+      '  - ' + w.title + ' | ' + (w.clients?.name || '?') + ' | Stage: ' + w.stage + ' | Owner: ' + (w.team_members?.name || 'unassigned')
+    ).join('\n')
+    context += '\n\nDUE TODAY:\n' + lines
+  }
+
+  // Tasks with due dates
+  const filteredTasks = level === 'team'
+    ? (allTasks || []).filter((t: any) => (t.work_orders as any)?.team_members?.auth_user_id === authUserId)
+    : (allTasks || [])
+
+  const overdueTasks = filteredTasks.filter((t: any) => t.due_date && t.due_date < today)
+  const tasksDueToday = filteredTasks.filter((t: any) => t.due_date === today)
+  const upcomingTasks = filteredTasks.filter((t: any) => t.due_date && t.due_date > today).slice(0, 20)
+
+  if (overdueTasks.length > 0 || tasksDueToday.length > 0) {
+    const taskLines = [
+      ...overdueTasks.map((t: any) => '  - [OVERDUE] ' + t.title + ' (WO: ' + ((t.work_orders as any)?.title || '?') + ' | ' + ((t.work_orders as any)?.clients?.name || '?') + ') due ' + t.due_date),
+      ...tasksDueToday.map((t: any) => '  - [DUE TODAY] ' + t.title + ' (WO: ' + ((t.work_orders as any)?.title || '?') + ' | ' + ((t.work_orders as any)?.clients?.name || '?') + ')'),
+    ].join('\n')
+    context += '\n\nTASK ALERTS:\n' + taskLines
+  }
+
+  if (upcomingTasks.length > 0) {
+    const taskLines = upcomingTasks.map((t: any) =>
+      '  - ' + t.title + ' (WO: ' + ((t.work_orders as any)?.title || '?') + ' | ' + ((t.work_orders as any)?.clients?.name || '?') + ') due ' + t.due_date
+    ).join('\n')
+    context += '\n\nUPCOMING TASKS (next 20):\n' + taskLines
+  }
+
   context += '\n\nGUIDELINES:\n' +
     '- Be concise and direct. Use bullet points for lists.\n' +
     '- When showing WO lists, include stage, client, and due date.\n' +
     '- For financial questions, always show numbers clearly.\n' +
-    '- If asked about something outside your data, say so clearly.\n' +
+    '- IMPORTANT: When you cannot find a WO by name, ALWAYS use the search_archived_wos tool to search before saying it does not exist. Never tell users to check with someone else — search first.\n' +
+    '- For "overdue" questions, focus on WOs in "approved" stage with past due dates — these are the actionable ones.\n' +
+    '- For daily rundown requests, show: overdue approved WOs, items due today, and task alerts.\n' +
     '- You can filter, sort, and analyze the data above to answer questions.\n' +
-    '- Address the user by their first name.'
+    '- Address the user by their first name.\n' +
+    '- Do not suggest users check with Tanya, Montse, or anyone else. Search the data yourself.'
 
   return context
 }
