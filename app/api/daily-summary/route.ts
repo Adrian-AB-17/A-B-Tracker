@@ -38,7 +38,8 @@ export async function GET(req: NextRequest) {
       (w.wo_assignees || []).some((a: any) => a.team_members?.auth_user_id === user.id)
     )
 
-    const overdueApproved = filtered.filter((w: any) => w.due_date && w.due_date < today && w.stage === 'approved')
+    const EXCLUDE_OVERDUE = ['approved', 'sent-for-approval', 'revisions-received', 'paid', 'invoiced', 'archived']
+    const overdueApproved = filtered.filter((w: any) => w.due_date && w.due_date < today && !EXCLUDE_OVERDUE.includes(w.stage))
     const dueToday = filtered.filter((w: any) => w.due_date === today)
 
     const { data: tasks } = await supabaseAdmin

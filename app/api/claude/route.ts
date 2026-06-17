@@ -174,8 +174,9 @@ async function buildContext(level: 'owner' | 'admin' | 'team', authUserId: strin
   }
 
   // Daily rundown — WOs due today or overdue (approved stage)
+  const EXCLUDE_OVERDUE = ['approved', 'sent-for-approval', 'revisions-received', 'paid', 'invoiced', 'archived']
   const overdueApproved = filteredWos.filter((w: any) =>
-    w.due_date && w.due_date < today && w.stage === 'approved'
+    w.due_date && w.due_date < today && !EXCLUDE_OVERDUE.includes(w.stage)
   )
   const dueToday = filteredWos.filter((w: any) => w.due_date === today)
 
