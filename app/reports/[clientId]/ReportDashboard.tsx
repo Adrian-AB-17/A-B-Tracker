@@ -424,6 +424,17 @@ export default function ReportDashboard({
   const hasLiveAds = liveAds != null && (liveAds.metaSpend != null || liveAds.gadsSpend != null)
   const hasAnyData = hasData || hasLiveAds
 
+  const monthOptions = useMemo(() => {
+    const opts = []
+    const now = new Date()
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      opts.push({ value: val, label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) })
+    }
+    return opts
+  }, [])
+
   async function saveNarrative() {
     setSavingNarrative(true)
     await supabase.from('client_reports').upsert({
@@ -526,12 +537,9 @@ export default function ReportDashboard({
                     fontWeight: 600, cursor: 'pointer',
                   }}
                 >
-                  {Array.from({ length: 6 }, (_, i) => {
-                    const d = new Date();
-                    d.setMonth(d.getMonth() - i);
-                    const val = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                    return <option key={val} value={val}>{d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>;
-                  })}
+                  {monthOptions.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
                 </select>
               </div>
               <div className="flex items-center gap-3 mt-1">
