@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const CLIENTS = [
+  { id: 'a-b-consulting-group',  name: 'A&B Consulting Group' },
   { id: 'nico-roofing',          name: 'Nico Roofing & Exteriors' },
   { id: 'culture',               name: 'Culture Construction' },
   { id: 'kbc-exteriors',         name: 'KBC Exteriors LLC' },
@@ -30,6 +31,8 @@ function matchesClient(profile: string, clientId: string): boolean {
       return p.includes('midwest construction experts') || p === 'midwest_construction_exp'
     case 'nico-roofing':
       return p === 'nico roofing' || p === '@nicoroofing'
+    case 'a-b-consulting-group':
+      return p === 'a&b consulting group' || p === 'ab_consulting_group' || p.includes('a&b consulting')
     default:
       return false
   }
