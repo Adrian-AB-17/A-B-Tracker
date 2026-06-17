@@ -2,6 +2,8 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+const CHART_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4']
 
 // ─── Live Data Tab ────────────────────────────────────────────────────────────
 
@@ -129,6 +131,76 @@ function GAdsTab({ clientId, month, clientColor }: { clientId: string; month: st
         <KpiCard label="Cost/Conv." value={m(data.costPerConversion)} color={clientColor} />
         <KpiCard label="ROAS" value={data.roas != null ? `${data.roas}x` : '—'} color={clientColor} />
       </div>
+
+      {/* Charts row */}
+      {data.daily?.length > 1 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Impressions + Clicks over time */}
+          <div className="md:col-span-2 rounded-xl border p-4" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+            <div className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Impressions & Clicks Over Time</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={data.daily}>
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(d: string) => d.slice(5)} />
+                <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
+                <Tooltip formatter={(val: any) => Number(val).toLocaleString()} labelFormatter={(d: any) => d} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line yAxisId="left" type="monotone" dataKey="impressions" stroke="#3b82f6" dot={false} name="Impressions" />
+                <Line yAxisId="right" type="monotone" dataKey="clicks" stroke="#f59e0b" dot={false} name="Clicks" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {/* Device breakdown */}
+          {data.devices?.length > 0 && (
+            <div className="rounded-xl border p-4" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+              <div className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Clicks by Device</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={data.devices} dataKey="clicks" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }: any) => `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false} fontSize={10}>
+                    {data.devices.map((_: unknown, i: number) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(val: any) => Number(val).toLocaleString()} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Charts row */}
+      {data.daily?.length > 1 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Impressions + Clicks over time */}
+          <div className="md:col-span-2 rounded-xl border p-4" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+            <div className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Impressions & Clicks Over Time</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={data.daily}>
+                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(d: string) => d.slice(5)} />
+                <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
+                <Tooltip formatter={(val: any) => Number(val).toLocaleString()} labelFormatter={(d: any) => d} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Line yAxisId="left" type="monotone" dataKey="impressions" stroke="#3b82f6" dot={false} name="Impressions" />
+                <Line yAxisId="right" type="monotone" dataKey="clicks" stroke="#f59e0b" dot={false} name="Clicks" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          {/* Device breakdown */}
+          {data.devices?.length > 0 && (
+            <div className="rounded-xl border p-4" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+              <div className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Clicks by Device</div>
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={data.devices} dataKey="clicks" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }: any) => `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`} labelLine={false} fontSize={10}>
+                    {data.devices.map((_: unknown, i: number) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(val: any) => Number(val).toLocaleString()} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      )}
       {data.campaigns?.length > 0 && (
         <div>
           <div className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Campaign Breakdown</div>

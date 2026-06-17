@@ -105,6 +105,24 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.cost - a.cost)
       .slice(0, 8);
 
+    const dailyMap: Record<string, { date: string; impressions: number; clicks: number; cost: number }> = {};
+    rows.forEach(r => {
+      const date = String(r.date || '').slice(0, 10);
+      if (!date) return;
+      if (!dailyMap[date]) dailyMap[date] = { date, impressions: 0, clicks: 0, cost: 0 };
+      dailyMap[date].impressions += n(r.impressions);
+      dailyMap[date].clicks      += n(r.clicks);
+      dailyMap[date].cost        += n(r.spend);
+    });
+    const daily = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+
+    const deviceMap: Record<string, number> = {};
+    rows.forEach(r => {
+      const device = String(r.device || r.device_type || 'Unknown');
+      deviceMap[device] = (deviceMap[device] || 0) + n(r.clicks);
+    });
+    const devices = Object.entries(deviceMap).map(([name, clicks]) => ({ name, clicks })).sort((a, b) => b.clicks - a.clicks);
+
     return NextResponse.json({
       configured: true, clientId, month,
       data: {
@@ -120,6 +138,8 @@ export async function GET(req: NextRequest) {
         roas:              t.cost > 0        ? parseFloat((t.conversion_value / t.cost).toFixed(2)) : 0,
         costPerConversion: t.conversions > 0 ? parseFloat((t.cost / t.conversions).toFixed(2)) : 0,
         campaigns,
+        daily,
+        devices,
       },
     });
   } catch (err: unknown) {

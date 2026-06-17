@@ -68,6 +68,29 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.spend - a.spend)
       .slice(0, 5);
 
+    // Daily time series
+    const dailyMap: Record<string, { date: string; impressions: number; clicks: number; spend: number }> = {};
+    rows.forEach(r => {
+      const date = String(r.date || '').slice(0, 10);
+      if (!date) return;
+      if (!dailyMap[date]) dailyMap[date] = { date, impressions: 0, clicks: 0, spend: 0 };
+      dailyMap[date].impressions += n(r.impressions);
+      dailyMap[date].clicks      += n(r.clicks);
+      dailyMap[date].spend       += n(r.spend);
+    });
+    const daily = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+
+    // Device breakdown
+    const deviceMap: Record<string, number> = {};
+    rows.forEach(r => {
+      const device = String(r.device || r.impression_device || 'Unknown');
+      deviceMap[device] = (deviceMap[device] || 0) + n(r.impressions);
+    });
+    const devices = Object.entries(deviceMap)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+
     return NextResponse.json({
       configured: true, clientId, month,
       data: {
