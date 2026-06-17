@@ -360,7 +360,16 @@ function EmailSection({ ch }: { ch: ChannelData | null }) {
 export default function ReportsPage() {
   const supabase = createClient();
   const [clients, setClients] = useState<Client[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    // Default to previous month if we're in the first week, otherwise current month
+    const now = new Date()
+    if (now.getDate() <= 10) {
+      // First 10 days — likely no data for current month yet, show previous
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      return prev.toISOString().slice(0, 7)
+    }
+    return now.toISOString().slice(0, 7)
+  });
   const [expanded, setExpanded] = useState<string | null>(null);
   const [reportData, setReportData] = useState<Record<string, ClientReportData>>({});
   const [loadingClients, setLoadingClients] = useState(true);
