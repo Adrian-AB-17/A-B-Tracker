@@ -173,7 +173,14 @@ function EmailTab({ clientId, month }: { clientId: string; month: string }) {
   const [loading, setLoading] = React.useState(true)
   const [msg, setMsg] = React.useState('')
 
+  const [prevEmail, setPrevEmail] = React.useState<Record<string, any> | null>(null)
+  const [lastYearEmail, setLastYearEmail] = React.useState<Record<string, any> | null>(null)
+
   React.useEffect(() => {
+    const [year, mon] = month.split('-').map(Number)
+    const prevMonth = mon === 1 ? `${year-1}-12` : `${year}-${String(mon-1).padStart(2,'0')}`
+    const lastYearMonth = `${year-1}-${String(mon).padStart(2,'0')}`
+
     fetch(`/api/reports/email?clientId=${clientId}&month=${month}`)
       .then(r => r.json())
       .then(d => {
@@ -182,6 +189,11 @@ function EmailTab({ clientId, month }: { clientId: string; month: string }) {
         setData(d.data); setLoading(false)
       })
       .catch(() => { setMsg('Error loading email data.'); setLoading(false) })
+
+    fetch(`/api/reports/email?clientId=${clientId}&month=${prevMonth}`)
+      .then(r => r.json()).then(d => { if (d.data) setPrevEmail(d.data) }).catch(() => {})
+    fetch(`/api/reports/email?clientId=${clientId}&month=${lastYearMonth}`)
+      .then(r => r.json()).then(d => { if (d.data) setLastYearEmail(d.data) }).catch(() => {})
   }, [clientId, month])
 
   const f = (n: number | null | undefined) => n != null ? n.toLocaleString('en-US') : '—'
@@ -194,18 +206,24 @@ function EmailTab({ clientId, month }: { clientId: string; month: string }) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Campaigns', value: f(data.campaignCount) },
-          { label: 'Sends', value: f(data.sends) },
-          { label: 'Opens', value: f(data.opens) },
-          { label: 'Open Rate', value: p(data.openRate) },
-          { label: 'Clicks', value: f(data.clicks) },
-          { label: 'Click Rate', value: p(data.clickRate) },
-          { label: 'Unsubscribes', value: f(data.unsubscribes) },
-          { label: 'Bounces', value: f(data.bounces) },
-        ].map(({ label, value }) => (
+          { label: 'Campaigns', value: f(data.campaignCount), raw: data.campaignCount, prevRaw: prevEmail?.campaignCount, lyRaw: lastYearEmail?.campaignCount },
+          { label: 'Sends', value: f(data.sends), raw: data.sends, prevRaw: prevEmail?.sends, lyRaw: lastYearEmail?.sends },
+          { label: 'Opens', value: f(data.opens), raw: data.opens, prevRaw: prevEmail?.opens, lyRaw: lastYearEmail?.opens },
+          { label: 'Open Rate', value: p(data.openRate), raw: data.openRate, prevRaw: prevEmail?.openRate, lyRaw: lastYearEmail?.openRate },
+          { label: 'Clicks', value: f(data.clicks), raw: data.clicks, prevRaw: prevEmail?.clicks, lyRaw: lastYearEmail?.clicks },
+          { label: 'Click Rate', value: p(data.clickRate), raw: data.clickRate, prevRaw: prevEmail?.clickRate, lyRaw: lastYearEmail?.clickRate },
+          { label: 'Unsubscribes', value: f(data.unsubscribes), raw: data.unsubscribes, prevRaw: prevEmail?.unsubscribes, lyRaw: lastYearEmail?.unsubscribes },
+          { label: 'Bounces', value: f(data.bounces), raw: data.bounces, prevRaw: prevEmail?.bounces, lyRaw: lastYearEmail?.bounces },
+        ].map(({ label, value, raw, prevRaw, lyRaw }) => (
           <div key={label} className="rounded-xl border p-4" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
             <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>{label}</div>
             <div className="text-xl font-bold" style={{ color: 'var(--brand-navy, #1a2744)' }}>{value}</div>
+            {(prevRaw != null || lyRaw != null) && (
+              <div className="mt-1 flex flex-wrap gap-y-0.5">
+                <DeltaBadge current={raw} compare={prevRaw} label="vs prev" />
+                <DeltaBadge current={raw} compare={lyRaw} label="vs last yr" />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -242,7 +260,14 @@ function GAdsTab({ clientId, month, clientColor }: { clientId: string; month: st
   const [loading, setLoading] = React.useState(true)
   const [msg, setMsg] = React.useState('')
 
+  const [prevData, setPrevData] = React.useState<Record<string, any> | null>(null)
+  const [lastYearData, setLastYearData] = React.useState<Record<string, any> | null>(null)
+
   React.useEffect(() => {
+    const [year, mon] = month.split('-').map(Number)
+    const prevMonth = mon === 1 ? `${year-1}-12` : `${year}-${String(mon-1).padStart(2,'0')}`
+    const lastYearMonth = `${year-1}-${String(mon).padStart(2,'0')}`
+
     fetch(`/api/reports/google-ads?clientId=${clientId}&month=${month}`)
       .then(r => r.json())
       .then(d => {
@@ -251,6 +276,12 @@ function GAdsTab({ clientId, month, clientColor }: { clientId: string; month: st
         setData(d.data); setLoading(false)
       })
       .catch(() => { setMsg('Error loading Google Ads data.'); setLoading(false) })
+
+    fetch(`/api/reports/google-ads?clientId=${clientId}&month=${prevMonth}`)
+      .then(r => r.json()).then(d => { if (d.data) setPrevData(d.data) }).catch(() => {})
+
+    fetch(`/api/reports/google-ads?clientId=${clientId}&month=${lastYearMonth}`)
+      .then(r => r.json()).then(d => { if (d.data) setLastYearData(d.data) }).catch(() => {})
   }, [clientId, month])
 
   const f = (n: number | null | undefined) => n != null ? n.toLocaleString('en-US') : '—'
@@ -263,16 +294,16 @@ function GAdsTab({ clientId, month, clientColor }: { clientId: string; month: st
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <KpiCard label="Raw Spend" value={m(data.spend)} color={clientColor} />
-        <KpiCard label="Billed to Client" value={m(data.billedSpend ?? data.spend)} color={clientColor} />
-        <KpiCard label="Clicks" value={f(data.clicks)} color={clientColor} />
-        <KpiCard label="CTR" value={p(data.ctr)} color={clientColor} />
-        <KpiCard label="Conversions" value={f(data.conversions)} color={clientColor} />
-        <KpiCard label="Impressions" value={f(data.impressions)} color={clientColor} />
-        <KpiCard label="CPC" value={m(data.cpc)} color={clientColor} />
-        <KpiCard label="CPM" value={m(data.cpm)} color={clientColor} />
-        <KpiCard label="Cost/Conv." value={m(data.costPerConversion)} color={clientColor} />
-        <KpiCard label="ROAS" value={data.roas != null ? `${data.roas}x` : '—'} color={clientColor} />
+        <KpiCard label="Raw Spend" value={m(data.spend)} color={clientColor} rawValue={data.spend} prevValue={prevData?.spend} lastYearValue={lastYearData?.spend} />
+        <KpiCard label="Billed to Client" value={m(data.billedSpend ?? data.spend)} color={clientColor} rawValue={data.billedSpend ?? data.spend} prevValue={prevData?.billedSpend} lastYearValue={lastYearData?.billedSpend} />
+        <KpiCard label="Clicks" value={f(data.clicks)} color={clientColor} rawValue={data.clicks} prevValue={prevData?.clicks} lastYearValue={lastYearData?.clicks} />
+        <KpiCard label="CTR" value={p(data.ctr)} color={clientColor} rawValue={data.ctr} prevValue={prevData?.ctr} lastYearValue={lastYearData?.ctr} />
+        <KpiCard label="Conversions" value={f(data.conversions)} color={clientColor} rawValue={data.conversions} prevValue={prevData?.conversions} lastYearValue={lastYearData?.conversions} />
+        <KpiCard label="Impressions" value={f(data.impressions)} color={clientColor} rawValue={data.impressions} prevValue={prevData?.impressions} lastYearValue={lastYearData?.impressions} />
+        <KpiCard label="CPC" value={m(data.cpc)} color={clientColor} rawValue={data.cpc} prevValue={prevData?.cpc} lastYearValue={lastYearData?.cpc} />
+        <KpiCard label="CPM" value={m(data.cpm)} color={clientColor} rawValue={data.cpm} prevValue={prevData?.cpm} lastYearValue={lastYearData?.cpm} />
+        <KpiCard label="Cost/Conv." value={m(data.costPerConversion)} color={clientColor} rawValue={data.costPerConversion} prevValue={prevData?.costPerConversion} lastYearValue={lastYearData?.costPerConversion} />
+        <KpiCard label="ROAS" value={data.roas != null ? `${data.roas}x` : '—'} color={clientColor} rawValue={data.roas} prevValue={prevData?.roas} lastYearValue={lastYearData?.roas} />
       </div>
 
       {/* Charts row */}
@@ -1469,13 +1500,40 @@ export default function ReportDashboard({
 
 // ── Shared components ────────────────────────────────────────────────────────
 
-function KpiCard({ label, value, sub, color }: { label: string; value: string; sub?: string; color: string }) {
+function delta(current: number | null | undefined, compare: number | null | undefined) {
+  if (current == null || compare == null || compare === 0) return null
+  return ((current - compare) / Math.abs(compare)) * 100
+}
+
+function DeltaBadge({ current, compare, label }: { current: number | null | undefined; compare: number | null | undefined; label: string }) {
+  const d = delta(current, compare)
+  if (d == null) return null
+  const up = d >= 0
+  const color = up ? '#10b981' : '#ef4444'
+  const arrow = up ? '↑' : '↓'
+  return (
+    <span className="text-xs mr-2" style={{ color }}>
+      {arrow} {Math.abs(d).toFixed(1)}% <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+    </span>
+  )
+}
+
+function KpiCard({ label, value, sub, color, rawValue, prevValue, lastYearValue }: {
+  label: string; value: string; sub?: string; color: string;
+  rawValue?: number | null; prevValue?: number | null; lastYearValue?: number | null
+}) {
   return (
     <div className="rounded-xl border p-4"
       style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)', borderTopWidth: 3, borderTopColor: color }}>
       <div className="text-xs uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>{label}</div>
       <div className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{value}</div>
       {sub && <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{sub}</div>}
+      {(prevValue != null || lastYearValue != null) && (
+        <div className="mt-2 flex flex-wrap gap-y-0.5">
+          <DeltaBadge current={rawValue} compare={prevValue} label="vs prev" />
+          <DeltaBadge current={rawValue} compare={lastYearValue} label="vs last yr" />
+        </div>
+      )}
     </div>
   )
 }

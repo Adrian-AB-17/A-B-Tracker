@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     .eq('auth_user_id', user.id)
     .maybeSingle()
 
-  if (!member || member.active === false || member.role !== 'admin') {
+  if (!member || member.active === false || member.role !== 'admin' && member.role !== 'owner') {
     return NextResponse.json({ error: 'Admin access required.' }, { status: 403 })
   }
 
