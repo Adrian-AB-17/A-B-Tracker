@@ -275,6 +275,12 @@ export default function ReportDashboard({
   const [generatingHighlights, setGeneratingHighlights] = useState(false)
   const [savingHighlights, setSavingHighlights] = useState(false)
 
+  // Live ad data from Windsor when report_data has no meta/gads
+  const [liveAds, setLiveAds] = useState<{
+    metaSpend: number | null; metaClicks: number | null; metaCtr: number | null; metaCpc: number | null; metaImpressions: number | null;
+    gadsSpend: number | null; gadsClicks: number | null; gadsCtr: number | null; gadsCpc: number | null; gadsConversions: number | null; gadsBilled: number | null;
+  } | null>(null)
+
   // Build enriched summary including Windsor live data
   function buildSummary() {
     const base = reportData.map(r => `${r.section} / ${r.platform} / ${r.metric}: ${r.value}`).join('\n')
@@ -292,12 +298,6 @@ export default function ReportDashboard({
     ].filter(Boolean).join('\n')
     return [base, adLines].filter(Boolean).join('\n')
   }
-
-  // Live ad data from Windsor when report_data has no meta/gads
-  const [liveAds, setLiveAds] = useState<{
-    metaSpend: number | null; metaClicks: number | null; metaCtr: number | null; metaCpc: number | null; metaImpressions: number | null;
-    gadsSpend: number | null; gadsClicks: number | null; gadsCtr: number | null; gadsCpc: number | null; gadsConversions: number | null; gadsBilled: number | null;
-  } | null>(null)
 
   useEffect(() => {
     // Only fetch Windsor if report_data has no meta_ads rows
