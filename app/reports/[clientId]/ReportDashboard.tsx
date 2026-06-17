@@ -166,6 +166,138 @@ function GAdsTab({ clientId, month, clientColor }: { clientId: string; month: st
   )
 }
 
+function WebsiteTab({ clientId, month }: { clientId: string; month: string }) {
+  const [ga4, setGa4] = React.useState<Record<string, any> | null>(null)
+  const [sc, setSc] = React.useState<Record<string, any> | null>(null)
+  const [loading, setLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    const q = `clientId=${clientId}&month=${month}`
+    Promise.all([
+      fetch(`/api/reports/ga4?${q}`).then(r => r.json()).catch(() => null),
+      fetch(`/api/reports/search-console?${q}`).then(r => r.json()).catch(() => null),
+    ]).then(([g, s]) => {
+      setGa4(g?.data || null)
+      setSc(s?.configured ? (s?.data || null) : null)
+      setLoading(false)
+    })
+  }, [clientId, month])
+
+  const f = (n: number | null | undefined) => n != null ? n.toLocaleString('en-US') : '—'
+  const p = (n: number | null | undefined) => n != null ? `${Number(n).toFixed(1)}%` : '—'
+
+  if (loading) return <div className="text-sm" style={{ color: 'var(--text-muted)', padding: '20px 0' }}>Loading website data…</div>
+
+  return (
+    <div className="space-y-6">
+      {/* GA4 Section */}
+      {ga4 && (
+        <div>
+          <div className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>📊 Website Analytics (GA4)</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: 'Sessions', value: f(ga4.sessions) },
+              { label: 'Users', value: f(ga4.users) },
+              { label: 'New Users', value: f(ga4.newUsers) },
+              { label: 'Bounce Rate', value: p(ga4.bounceRate) },
+              { label: 'Avg Session', value: ga4.avgSessionDuration ? `${Math.floor(Number(ga4.avgSessionDuration)/60)}m ${Math.round(Number(ga4.avgSessionDuration)%60)}s` : '—' },
+              { label: 'Page Views', value: f(ga4.pageViews) },
+              { label: 'Conversions', value: f(ga4.conversions) },
+              { label: 'Top Channel', value: String(ga4.topChannel || '—') },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-xl border p-4" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+                <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>{label}</div>
+                <div className="text-xl font-bold" style={{ color: 'var(--brand-navy, #1a2744)' }}>{value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Search Console Section */}
+      {sc ? (
+        <div>
+          <div className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>🔍 Search Console (SEO)</div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            {[
+              { label: 'Total Clicks', value: f(sc.clicks) },
+              { label: 'Impressions', value: f(sc.impressions) },
+              { label: 'Avg CTR', value: p(sc.ctr) },
+              { label: 'Avg Position', value: sc.position != null ? `#${sc.position}` : '—' },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-xl border p-4" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+                <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>{label}</div>
+                <div className="text-xl font-bold" style={{ color: 'var(--brand-navy, #1a2744)' }}>{value}</div>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Top Queries */}
+            {sc.topQueries?.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Top Queries</div>
+                <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-sunken)' }}>
+                        {['Query', 'Clicks', 'Impr.', 'CTR', 'Pos.'].map(h => (
+                          <th key={h} style={{ textAlign: 'left', padding: '6px 10px', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sc.topQueries.map((q: any, i: number) => (
+                        <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                          <td style={{ padding: '6px 10px', fontWeight: 500, color: 'var(--brand-navy, #1a2744)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{q.query}</td>
+                          <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{q.clicks}</td>
+                          <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{q.impressions}</td>
+                          <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{q.ctr}%</td>
+                          <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>#{q.position}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+            {/* Top Pages */}
+            {sc.topPages?.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Top Landing Pages</div>
+                <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg-sunken)' }}>
+                        {['Page', 'Clicks', 'Impr.', 'Pos.'].map(h => (
+                          <th key={h} style={{ textAlign: 'left', padding: '6px 10px', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sc.topPages.map((pg: any, i: number) => (
+                        <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                          <td style={{ padding: '6px 10px', fontWeight: 500, color: 'var(--brand-navy, #1a2744)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pg.page || '/'}</td>
+                          <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{pg.clicks}</td>
+                          <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>{pg.impressions}</td>
+                          <td style={{ padding: '6px 10px', fontFamily: 'monospace' }}>#{pg.position}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="text-sm rounded-lg px-3 py-2" style={{ background: 'var(--bg-sunken)', color: 'var(--text-muted)' }}>
+          Search Console not configured for this client.
+        </div>
+      )}
+    </div>
+  )
+}
+
 function GA4Tab({ clientId, month }: { clientId: string; month: string }) {
   const [data, setData] = React.useState<Record<string, number | string | null> | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -1092,7 +1224,7 @@ export default function ReportDashboard({
 
         {/* ── WEBSITE ─────────────────────────────────────────────────────── */}
         {tab === 'website' && (
-          <GA4Tab clientId={clientId} month={month} />
+          <WebsiteTab clientId={clientId} month={month} />
         )}
 
         {/* ── EMAIL ───────────────────────────────────────────────────────── */}
