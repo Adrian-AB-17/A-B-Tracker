@@ -92,6 +92,80 @@ function EmailTab({ clientId, month }: { clientId: string; month: string }) {
   )
 }
 
+function GAdsTab({ clientId, month, clientColor }: { clientId: string; month: string; clientColor: string }) {
+  const [data, setData] = React.useState<Record<string, any> | null>(null)
+  const [loading, setLoading] = React.useState(true)
+  const [msg, setMsg] = React.useState('')
+
+  React.useEffect(() => {
+    fetch(`/api/reports/google-ads?clientId=${clientId}&month=${month}`)
+      .then(r => r.json())
+      .then(d => {
+        if (!d.configured) { setMsg('Google Ads not configured for this client.'); setLoading(false); return }
+        if (!d.data) { setMsg(d.message || 'No data for this period.'); setLoading(false); return }
+        setData(d.data); setLoading(false)
+      })
+      .catch(() => { setMsg('Error loading Google Ads data.'); setLoading(false) })
+  }, [clientId, month])
+
+  const f = (n: number | null | undefined) => n != null ? n.toLocaleString('en-US') : '—'
+  const p = (n: number | null | undefined) => n != null ? `${Number(n).toFixed(2)}%` : '—'
+  const m = (n: number | null | undefined) => n != null ? `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+
+  if (loading) return <div className="text-sm" style={{ color: 'var(--text-muted)', padding: '20px 0' }}>Loading Google Ads data…</div>
+  if (!data) return <div className="text-sm" style={{ color: 'var(--text-muted)', padding: '20px 0' }}>{msg}</div>
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <KpiCard label="Raw Spend" value={m(data.spend)} color={clientColor} />
+        <KpiCard label="Billed to Client" value={m(data.billedSpend ?? data.spend)} color={clientColor} />
+        <KpiCard label="Clicks" value={f(data.clicks)} color={clientColor} />
+        <KpiCard label="CTR" value={p(data.ctr)} color={clientColor} />
+        <KpiCard label="Conversions" value={f(data.conversions)} color={clientColor} />
+        <KpiCard label="Impressions" value={f(data.impressions)} color={clientColor} />
+        <KpiCard label="CPC" value={m(data.cpc)} color={clientColor} />
+        <KpiCard label="CPM" value={m(data.cpm)} color={clientColor} />
+        <KpiCard label="Cost/Conv." value={m(data.costPerConversion)} color={clientColor} />
+        <KpiCard label="ROAS" value={data.roas != null ? `${data.roas}x` : '—'} color={clientColor} />
+      </div>
+      {data.campaigns?.length > 0 && (
+        <div>
+          <div className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Campaign Breakdown</div>
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-sunken)' }}>
+                  {['Campaign', 'Account', 'Spend', 'Clicks', 'CTR', 'Conv.'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.campaigns.map((c: any, i: number) => (
+                  <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '8px 12px', fontWeight: 500, color: 'var(--brand-navy, #1a2744)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</td>
+                    <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)' }}>{c.account}</td>
+                    <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>{m(c.cost)}</td>
+                    <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>{f(c.clicks)}</td>
+                    <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>{p(c.ctr)}</td>
+                    <td style={{ padding: '8px 12px', fontFamily: 'monospace' }}>{f(c.conversions)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      {data.markupPct > 0 && (
+        <div className="text-xs rounded-lg px-3 py-2" style={{ background: 'var(--bg-sunken)', color: 'var(--text-muted)' }}>
+          💡 Billed to client includes {data.markupPct}% markup on raw Google spend.
+        </div>
+      )}
+    </div>
+  )
+}
+
 function GA4Tab({ clientId, month }: { clientId: string; month: string }) {
   const [data, setData] = React.useState<Record<string, number | string | null> | null>(null)
   const [loading, setLoading] = React.useState(true)
@@ -1013,19 +1087,7 @@ export default function ReportDashboard({
 
         {/* ── GOOGLE ADS ──────────────────────────────────────────────────── */}
         {tab === 'google' && (
-          <>
-            {liveAds?.gadsSpend != null ? (
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                <KpiCard label="Raw Spend" value={money(liveAds.gadsSpend)} color={clientColor} />
-                <KpiCard label="Billed to Client" value={money(liveAds.gadsBilled ?? liveAds.gadsSpend)} color={clientColor} />
-                <KpiCard label="Clicks" value={fmt(liveAds.gadsClicks)} color={clientColor} />
-                <KpiCard label="CTR" value={pct(liveAds.gadsCtr)} color={clientColor} />
-                <KpiCard label="Conversions" value={fmt(liveAds.gadsConversions)} color={clientColor} />
-              </div>
-            ) : (
-              <NoData message="No Google Ads data yet." action="Loading from Windsor…" />
-            )}
-          </>
+          <GAdsTab clientId={clientId} month={month} clientColor={clientColor} />
         )}
 
         {/* ── WEBSITE ─────────────────────────────────────────────────────── */}
