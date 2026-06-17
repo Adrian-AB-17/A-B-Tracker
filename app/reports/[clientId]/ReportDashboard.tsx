@@ -645,6 +645,8 @@ export default function ReportDashboard({
   clientId, clientName, clientInitials, clientColor,
   month, reportData, report, uploads,
 }: Props) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
   const supabase = createClient()
   const [tab, setTab] = useState<TabId>('overview')
   const [narrative, setNarrative] = useState(report?.narrative || '')
@@ -885,6 +887,8 @@ export default function ReportDashboard({
     { id: 'website',  label: 'Website',    icon: '🌐' },
     { id: 'email',    label: 'Email',      icon: '📧' },
   ]
+
+  if (!mounted) return null
 
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg)' }}>
