@@ -275,6 +275,24 @@ export default function ReportDashboard({
   const [generatingHighlights, setGeneratingHighlights] = useState(false)
   const [savingHighlights, setSavingHighlights] = useState(false)
 
+  // Build enriched summary including Windsor live data
+  function buildSummary() {
+    const base = reportData.map(r => `${r.section} / ${r.platform} / ${r.metric}: ${r.value}`).join('\n')
+    if (!liveAds) return base
+    const adLines = [
+      liveAds.metaSpend    != null ? `meta_ads / meta / spend: ${liveAds.metaSpend}` : '',
+      liveAds.metaClicks   != null ? `meta_ads / meta / clicks: ${liveAds.metaClicks}` : '',
+      liveAds.metaCtr      != null ? `meta_ads / meta / ctr: ${liveAds.metaCtr}` : '',
+      liveAds.metaCpc      != null ? `meta_ads / meta / cpc: ${liveAds.metaCpc}` : '',
+      liveAds.gadsSpend    != null ? `google_ads / google / spend: ${liveAds.gadsSpend}` : '',
+      liveAds.gadsBilled   != null ? `google_ads / google / billed_spend: ${liveAds.gadsBilled}` : '',
+      liveAds.gadsClicks   != null ? `google_ads / google / clicks: ${liveAds.gadsClicks}` : '',
+      liveAds.gadsCtr      != null ? `google_ads / google / ctr: ${liveAds.gadsCtr}` : '',
+      liveAds.gadsConversions != null ? `google_ads / google / conversions: ${liveAds.gadsConversions}` : '',
+    ].filter(Boolean).join('\n')
+    return [base, adLines].filter(Boolean).join('\n')
+  }
+
   // Live ad data from Windsor when report_data has no meta/gads
   const [liveAds, setLiveAds] = useState<{
     metaSpend: number | null; metaClicks: number | null; metaCtr: number | null; metaCpc: number | null; metaImpressions: number | null;
@@ -308,7 +326,7 @@ export default function ReportDashboard({
 
   async function generateHighlights() {
     setGeneratingHighlights(true)
-    const summary = reportData.map(r => `${r.section} / ${r.platform} / ${r.metric}: ${r.value}`).join('\n')
+    const summary = buildSummary()
     try {
       const res = await fetch('/api/reports/narrative', {
         method: 'POST',
@@ -427,9 +445,7 @@ export default function ReportDashboard({
   async function generateNarrative() {
     if (!hasData) return
     setGenerating(true)
-    const summary = reportData.map(r =>
-      `${r.section}/${r.platform ?? 'all'}/${r.metric}: ${r.value}`
-    ).join('\n')
+    const summary = buildSummary()
     const res = await fetch('/api/reports/narrative', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -449,9 +465,7 @@ export default function ReportDashboard({
   async function askClaude() {
     if (!claudeQuery.trim()) return
     setClaudeLoading(true)
-    const summary = reportData.map(r =>
-      `${r.section}/${r.platform ?? 'all'}/${r.metric}: ${r.value}`
-    ).join('\n')
+    const summary = buildSummary()
     const res = await fetch('/api/reports/ask', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
