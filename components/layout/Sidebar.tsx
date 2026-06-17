@@ -296,6 +296,7 @@ export default function Sidebar({
             <span className="text-[10px]">{hqOpen ? '▾' : '▸'}</span>
           </button>
           {hqOpen && (
+            <>
             <div className="flex flex-col gap-0.5 mb-2">
               {HQ_ITEMS.filter(item => !item.adminOnly || (isAdmin && viewMode === 'admin')).map(item => {
                 const active = pathname === item.href || pathname.startsWith(item.href.split('?')[0])
@@ -311,8 +312,20 @@ export default function Sidebar({
                 )
               })}
             </div>
+            <div style={{ display: 'flex', gap: 4, paddingBottom: 6 }}>
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-daily-popup', { detail: 'morning' }))}
+                  style={{ flex: 1, fontSize: 11, padding: '4px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontWeight: 500 }}>
+                  ☀️ Standup
+                </button>
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent('open-daily-popup', { detail: 'eod' }))}
+                  style={{ flex: 1, fontSize: 11, padding: '4px 0', borderRadius: 6, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.8)', cursor: 'pointer', fontWeight: 500 }}>
+                  🌙 EOD
+                </button>
+              </div>
+            </>
           )}
-
           {/* TEAM TASKS section — collapsible list of team members */}
           {teamMemberBadges.length > 0 && (
             <>

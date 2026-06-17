@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Sidebar, { type SidebarCounts, type ClientBadge, type TeamMemberBadge } from '@/components/layout/Sidebar'
+import DailyPopups from '@/components/layout/DailyPopups'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
@@ -171,6 +172,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         teamMemberBadges={teamMemberBadges}
       />
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">{children}</main>
+      <DailyPopups />
     </div>
   )
 }
