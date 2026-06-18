@@ -27,8 +27,55 @@ export async function GET(req: NextRequest) {
   const month = searchParams.get('month') || new Date().toISOString().slice(0, 7);
   if (!clientId) return NextResponse.json({ error: 'clientId required' }, { status: 400 });
 
+  // Try CSV-uploaded data from gmb_location_data first
+  try {
+    const { createClient } = await import('@/lib/supabase/server');
+    const supabase = createClient();
+    const { data: locations } = await supabase
+      .from('gmb_location_data')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('month', month);
+
+    if (locations && locations.length > 0) {
+      const totals = locations.reduce((acc: Record<string, number>, loc: any) => {
+        acc.search_mobile    = (acc.search_mobile    || 0) + (loc.search_mobile    || 0)
+        acc.search_desktop   = (acc.search_desktop   || 0) + (loc.search_desktop   || 0)
+        acc.maps_mobile      = (acc.maps_mobile      || 0) + (loc.maps_mobile      || 0)
+        acc.maps_desktop     = (acc.maps_desktop     || 0) + (loc.maps_desktop     || 0)
+        acc.calls            = (acc.calls            || 0) + (loc.calls            || 0)
+        acc.directions       = (acc.directions       || 0) + (loc.directions       || 0)
+        acc.website_clicks   = (acc.website_clicks   || 0) + (loc.website_clicks   || 0)
+        return acc
+      }, {})
+
+      return NextResponse.json({
+        configured: true, clientId, month,
+        data: {
+          totalImpressions: totals.search_mobile + totals.search_desktop + totals.maps_mobile + totals.maps_desktop,
+          searchViews:      totals.search_mobile + totals.search_desktop,
+          mapsViews:        totals.maps_mobile + totals.maps_desktop,
+          calls:            totals.calls,
+          directions:       totals.directions,
+          websiteClicks:    totals.website_clicks,
+          locations:        locations.map((l: any) => ({
+            name:          l.business_name,
+            address:       l.address,
+            searchViews:   (l.search_mobile || 0) + (l.search_desktop || 0),
+            mapsViews:     (l.maps_mobile   || 0) + (l.maps_desktop   || 0),
+            calls:         l.calls || 0,
+            directions:    l.directions || 0,
+            websiteClicks: l.website_clicks || 0,
+          })),
+          source: 'csv',
+        },
+      })
+    }
+  } catch {}
+
+  // Fall back to API if no CSV data
   const locationName = GMB_LOCATION_MAP[clientId];
-  if (!locationName) return NextResponse.json({ configured: false, message: 'GMB location not configured', data: null });
+  if (!locationName) return NextResponse.json({ configured: false, message: 'GMB location not mapped. Upload CSV at /reports/upload', data: null });
 
   try {
     const auth = getAuth();

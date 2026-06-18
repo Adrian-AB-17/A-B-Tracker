@@ -153,25 +153,62 @@ function Divider() {
 
 function GmbSection({ ch }: { ch: ChannelData | null }) {
   if (!ch) return <div><SecHead icon="⭐" title="Reputation Management" configured={null} /><NoData msg="Loading…" /></div>;
-  const d = ch.data;
+  const d = ch.data as any;
+  const isCSV = d?.source === 'csv'
   return (
     <div>
       <SecHead icon="⭐" title="Reputation Management" configured={ch.configured} />
       {!ch.configured
-        ? <NoData msg="GMB location not mapped. Add to GMB_LOCATION_MAP in app/api/reports/gmb/route.ts" />
+        ? <NoData msg="No GMB data. Upload CSV at /reports/upload → GMB Performance" />
         : !d ? <NoData msg={ch.message} />
-        : (
+        : isCSV ? (
           <>
             <TileGrid>
-              <Tile label="Avg Rating" value={d.reviews.avgRating ? `${d.reviews.avgRating} ★` : '—'} sub={`${fmt(d.reviews.total)} total`} hi={d.reviews.avgRating >= 4.5 ? 'good' : d.reviews.avgRating >= 4 ? 'warn' : 'bad'} />
-              <Tile label="New Reviews" value={fmt(d.reviews.thisMonth)} sub="this month" />
-              <Tile label="Search Views" value={fmt(d.insights.viewsSearch)} />
-              <Tile label="Maps Views" value={fmt(d.insights.viewsMaps)} />
-              <Tile label="Calls" value={fmt(d.insights.actionsPhone)} />
-              <Tile label="Website Clicks" value={fmt(d.insights.actionsWebsite)} />
-              <Tile label="Directions" value={fmt(d.insights.actionsDriving)} />
+              <Tile label="Search Views"   value={fmt(d.searchViews)} />
+              <Tile label="Maps Views"     value={fmt(d.mapsViews)} />
+              <Tile label="Total Views"    value={fmt(d.totalImpressions)} />
+              <Tile label="Calls"          value={fmt(d.calls)} />
+              <Tile label="Directions"     value={fmt(d.directions)} />
+              <Tile label="Website Clicks" value={fmt(d.websiteClicks)} />
             </TileGrid>
-            {d.reviews.recent?.length > 0 && (
+            {d.locations?.length > 0 && (
+              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: 'var(--bg-sunken)' }}>
+                      {['Location','Search','Maps','Calls','Directions','Website'].map((h: string) => (
+                        <th key={h} style={{ textAlign: 'left', padding: '6px 10px', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.locations.map((l: any, i: number) => (
+                      <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                        <td style={{ padding: '6px 10px', fontWeight: 500, color: 'var(--text)' }}>{l.name}</td>
+                        <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(l.searchViews)}</td>
+                        <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(l.mapsViews)}</td>
+                        <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(l.calls)}</td>
+                        <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(l.directions)}</td>
+                        <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(l.websiteClicks)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <TileGrid>
+              <Tile label="Avg Rating" value={d.reviews?.avgRating ? `${d.reviews.avgRating} ★` : '—'} sub={`${fmt(d.reviews?.total)} total`} hi={d.reviews?.avgRating >= 4.5 ? 'good' : d.reviews?.avgRating >= 4 ? 'warn' : 'bad'} />
+              <Tile label="New Reviews" value={fmt(d.reviews?.thisMonth)} sub="this month" />
+              <Tile label="Search Views" value={fmt(d.insights?.viewsSearch)} />
+              <Tile label="Maps Views" value={fmt(d.insights?.viewsMaps)} />
+              <Tile label="Calls" value={fmt(d.insights?.actionsPhone)} />
+              <Tile label="Website Clicks" value={fmt(d.insights?.actionsWebsite)} />
+              <Tile label="Directions" value={fmt(d.insights?.actionsDriving)} />
+            </TileGrid>
+            {d.reviews?.recent?.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
                 <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>Recent Reviews</div>
                 {d.reviews.recent.map((r: { rating: string; text?: string; author?: string; date?: string }, i: number) => (
