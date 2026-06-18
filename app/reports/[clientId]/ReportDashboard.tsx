@@ -23,6 +23,7 @@ interface Approval {
   notes: string;
   approved_by: string | null;
   approved_at: string | null;
+  markup_pct: number | null;
 }
 
 function TopPostsSection({ clientId, month }: { clientId: string; month: string }) {
@@ -826,6 +827,7 @@ function LiveDataTab({ clientId, month }: { clientId: string; month: string }) {
   const [approvals, setApprovals] = useState<Record<string, Approval>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [editingNotes, setEditingNotes] = useState<Record<string, string>>({});
+  const [editingMarkup, setEditingMarkup] = useState<Record<string, string>>({});
   const [loadingApprovals, setLoadingApprovals] = useState(true);
 
   useEffect(() => {
@@ -834,10 +836,13 @@ function LiveDataTab({ clientId, month }: { clientId: string; month: string }) {
       .then(d => {
         setApprovals(d.approvals || {});
         const notes: Record<string, string> = {};
+        const markup: Record<string, string> = {};
         Object.entries(d.approvals || {}).forEach(([ch, a]) => {
           notes[ch] = (a as Approval).notes || '';
+          markup[ch] = (a as Approval).markup_pct != null ? String((a as Approval).markup_pct) : '30';
         });
         setEditingNotes(notes);
+        setEditingMarkup(markup);
       })
       .finally(() => setLoadingApprovals(false));
   }, [clientId, month]);
@@ -854,6 +859,7 @@ function LiveDataTab({ clientId, month }: { clientId: string; month: string }) {
         clientId, month, channel,
         approved: newApproved,
         notes: editingNotes[channel] || '',
+        markup_pct: parseFloat(editingMarkup[channel] || '30') || 30,
       }),
     });
 
@@ -879,11 +885,12 @@ function LiveDataTab({ clientId, month }: { clientId: string; month: string }) {
         clientId, month, channel,
         approved: approvals[channel]?.approved || false,
         notes: editingNotes[channel] || '',
+        markup_pct: parseFloat(editingMarkup[channel] || '30') || 30,
       }),
     });
     setApprovals(prev => ({
       ...prev,
-      [channel]: { ...prev[channel], notes: editingNotes[channel] || '' },
+      [channel]: { ...prev[channel], notes: editingNotes[channel] || '', markup_pct: parseFloat(editingMarkup[channel] || '30') || 30 },
     }));
     setSaving(prev => ({ ...prev, [`notes_${channel}`]: false }));
   };
@@ -960,15 +967,15 @@ function LiveDataTab({ clientId, month }: { clientId: string; month: string }) {
                 </button>
               </div>
 
-              {/* Notes field */}
-              <div style={{ marginTop: 10 }}>
+              {/* Notes + Markup row */}
+              <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                 <textarea
                   value={editingNotes[ch.id] || ''}
                   onChange={e => setEditingNotes(prev => ({ ...prev, [ch.id]: e.target.value }))}
                   placeholder={`Add notes for ${ch.label} — shown to client after approval`}
                   rows={2}
                   style={{
-                    width: '100%', fontSize: 12, padding: '8px 10px',
+                    flex: 1, fontSize: 12, padding: '8px 10px',
                     border: '1px solid var(--border)', borderRadius: 7,
                     background: 'var(--bg)', color: 'var(--text)',
                     resize: 'vertical', fontFamily: 'inherit',
@@ -980,10 +987,35 @@ function LiveDataTab({ clientId, month }: { clientId: string; month: string }) {
                     }
                   }}
                 />
-                {saving[`notes_${ch.id}`] && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>Saving…</div>
+                {(ch.id === 'meta' || ch.id === 'gads') && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 90 }}>
+                    <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>MARKUP %</label>
+                    <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 7, overflow: 'hidden', background: 'var(--bg)' }}>
+                      <input
+                        type="number"
+                        min="0"
+                        max="200"
+                        step="1"
+                        value={editingMarkup[ch.id] ?? '30'}
+                        onChange={e => setEditingMarkup(prev => ({ ...prev, [ch.id]: e.target.value }))}
+                        onBlur={() => saveNotes(ch.id)}
+                        style={{
+                          width: '100%', fontSize: 13, padding: '7px 8px', border: 'none',
+                          background: 'transparent', color: 'var(--text)', fontWeight: 600,
+                          fontFamily: 'monospace', outline: 'none',
+                        }}
+                      />
+                      <span style={{ paddingRight: 8, fontSize: 13, color: 'var(--text-muted)' }}>%</span>
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                      Billed: ${((parseFloat(editingMarkup[ch.id] || '30') / 100 + 1)).toFixed(2)}x raw
+                    </div>
+                  </div>
                 )}
               </div>
+              {saving[`notes_${ch.id}`] && (
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>Saving…</div>
+              )}
             </div>
           );
         })}

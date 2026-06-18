@@ -10,19 +10,20 @@ export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from('client_report_approvals')
-    .select('channel, approved, approved_by, approved_at, notes')
+    .select('channel, approved, approved_by, approved_at, notes, markup_pct')
     .eq('client_id', clientId)
     .eq('month', month);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const map: Record<string, { approved: boolean; notes: string; approved_by: string | null; approved_at: string | null }> = {};
+  const map: Record<string, { approved: boolean; notes: string; approved_by: string | null; approved_at: string | null; markup_pct: number | null }> = {};
   (data || []).forEach(row => {
     map[row.channel] = {
       approved: row.approved,
       notes: row.notes || '',
       approved_by: row.approved_by,
       approved_at: row.approved_at,
+      markup_pct: row.markup_pct ?? 30,
     };
   });
 
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { clientId, month, channel, approved, notes } = body;
+  const { clientId, month, channel, approved, notes, markup_pct } = body;
   if (!clientId || !month || !channel) return NextResponse.json({ error: 'clientId, month, channel required' }, { status: 400 });
 
   const supabase = await createClient();
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
       client_id: clientId, month, channel,
       approved: approved ?? false,
       notes: notes ?? '',
+      markup_pct: markup_pct ?? 30,
       approved_by: user?.email || null,
       approved_at: approved ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
