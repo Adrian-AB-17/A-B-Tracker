@@ -807,6 +807,15 @@ export default function BoardClient({ initialWorkOrders, clients, services, team
 
       {/* Mobile */}
       <div className="md:hidden flex-1 flex flex-col overflow-hidden">
+        <div className="bg-white border-b border-gray-200 px-3 pt-2 pb-1">
+          <input
+            type="text"
+            placeholder="🔍 Search work orders..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
         <div className="bg-white border-b border-gray-200 overflow-x-auto">
           <div className="flex gap-1 px-2 py-2 min-w-max">
             {BOARD_STAGES.map(stageId => {
