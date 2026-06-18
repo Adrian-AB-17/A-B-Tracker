@@ -20,13 +20,14 @@ export type WoOption = { id: string; title: string; clientName: string | null }
 export type Reaction = { id: string; post_id: string; user_id: string; emoji: string }
 
 const CHANNELS: { id: string; label: string }[] = [
-  { id: 'general', label: '🎉 General' },
-  { id: 'standup', label: '☀️ Standup' },
-  { id: 'design',  label: '🎨 Design' },
-  { id: 'ads',     label: '📣 Ads' },
-  { id: 'social',  label: '📱 Social' },
-  { id: 'email',   label: '✉️ Email' },
-  { id: 'web',     label: '🌐 Web' },
+  { id: 'general',  label: '🎉 General' },
+  { id: 'standup',  label: '☀️ Standup' },
+  { id: 'checkout', label: '🌙 Check-out' },
+  { id: 'design',   label: '🎨 Design' },
+  { id: 'ads',      label: '📣 Ads' },
+  { id: 'social',   label: '📱 Social' },
+  { id: 'email',    label: '✉️ Email' },
+  { id: 'web',      label: '🌐 Web' },
 ]
 
 const EMOJIS = ['👍', '✅', '👀', '🎉', '🔥', '❤️']
@@ -75,6 +76,8 @@ export default function StandupClient({
 
   const [body, setBody] = useState('')
   const [posting, setPosting] = useState(false)
+  const [checkoutNotes, setCheckoutNotes] = useState<{ member: string; note: string; type: string; date: string; updated_at: string }[]>([])
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
   const [postWo, setPostWo] = useState<string>('')   // WO id to link on new post
 
   const [mention, setMention] = useState<{ target: string; query: string; pos: number } | null>(null)
@@ -239,6 +242,27 @@ export default function StandupClient({
   }
 
   // ── derived ──
+  useEffect(() => {
+    if (channel !== 'checkout') return
+    setCheckoutLoading(true)
+    const today = new Date().toISOString().slice(0, 10)
+    supabase
+      .from('daily_standup_notes')
+      .select('note, type, date, updated_at, team_members!daily_standup_notes_member_id_fkey(name)')
+      .eq('date', today)
+      .order('updated_at', { ascending: false })
+      .then(({ data }) => {
+        setCheckoutNotes((data || []).map((r: any) => ({
+          member: r.team_members?.name || 'Unknown',
+          note: r.note,
+          type: r.type,
+          date: r.date,
+          updated_at: r.updated_at,
+        })))
+        setCheckoutLoading(false)
+      })
+  }, [channel])
+
   const channelPosts = useMemo(() => posts.filter(p => p.channel === channel), [posts, channel])
   const topLevel = useMemo(() =>
     channelPosts.filter(p => !p.parent_id).sort((a, b) => {
@@ -326,8 +350,39 @@ export default function StandupClient({
         </div>
       )}
 
-      {/* Composer */}
-      <div className="rounded-lg border p-3 mb-6 relative" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+      {/* Checkout channel — special render */}
+      {channel === 'checkout' && (
+        <div className="flex flex-col gap-3">
+          {checkoutLoading ? (
+            <div className="text-sm text-center py-10" style={{ color: 'var(--text-muted)' }}>Loading…</div>
+          ) : checkoutNotes.length === 0 ? (
+            <div className="text-sm text-center py-10" style={{ color: 'var(--text-muted)' }}>No check-outs submitted today yet. Notes appear here after team members close their EOD popup.</div>
+          ) : (
+            checkoutNotes.map((n, i) => (
+              <div key={i} className="rounded-lg border p-4" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full flex items-center justify-center font-bold text-xs" style={{ width: 28, height: 28, background: 'var(--brand-accent, #b8860b)', color: '#1a2744' }}>
+                      {n.member[0]?.toUpperCase()}
+                    </span>
+                    <span className="font-semibold text-sm" style={{ color: 'var(--text)' }}>{n.member}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: n.type === 'eod' ? '#0f1b2418' : '#f59e0b18', color: n.type === 'eod' ? 'var(--text-muted)' : '#b45309' }}>
+                      {n.type === 'eod' ? '🌙 EOD' : '☀️ Morning'}
+                    </span>
+                  </div>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {new Date(n.updated_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  </span>
+                </div>
+                <p className="text-sm" style={{ color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{n.note}</p>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Composer — hidden on checkout channel */}
+      {channel !== 'checkout' && <div className="rounded-lg border p-3 mb-6 relative" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
         <textarea value={body}
           onChange={e => onInput('main', e.target.value, e.target.selectionStart || 0, setBody)}
           placeholder={channel === 'standup' ? 'What are you working on today?' : 'Share an update…'}
@@ -344,7 +399,7 @@ export default function StandupClient({
             {posting ? 'Posting…' : 'Post'}
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* Feed */}
       {topLevel.length === 0 ? (
