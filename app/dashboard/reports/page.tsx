@@ -324,38 +324,80 @@ function LeadsSection({ ch }: { ch: ChannelData | null }) {
 
 function SocialSection({ ch }: { ch: ChannelData | null }) {
   if (!ch) return <div><SecHead icon="🌱" title="Social Media" configured={null} /><NoData msg="Loading…" /></div>;
-  const d = ch.data;
-  const PLATFORM_ICONS: Record<string, string> = {
-    facebook: '👥', instagram: '📸', x: '𝕏', linkedin: '💼', youtube: '▶️', tiktok: '🎵',
-  };
+  const d = ch.data as any;
+  if (!ch.configured) return <div><SecHead icon="🌱" title="Social Media (Sprout)" configured={ch.configured} /><NoData msg="No Sprout Social data uploaded for this month." /></div>;
+  if (!d?.platforms) return <div><SecHead icon="🌱" title="Social Media (Sprout)" configured={ch.configured} /><NoData msg={ch.message || 'No social data.'} /></div>;
+
+  // Aggregate totals across all platforms
+  const totals = Object.values(d.platforms as Record<string, Record<string, number>>).reduce((acc: Record<string, number>, s) => {
+    acc.impressions       = (acc.impressions       || 0) + (s.impressions       || 0)
+    acc.engagements       = (acc.engagements       || 0) + (s.engagements       || 0)
+    acc.post_link_clicks  = (acc.post_link_clicks  || 0) + (s.post_link_clicks  || 0)
+    acc.video_views       = (acc.video_views       || 0) + (s.video_views       || 0)
+    acc.posts             = (acc.posts             || 0) + (s.posts             || 0)
+    return acc
+  }, {})
+  const engRate = totals.impressions > 0 ? ((totals.engagements / totals.impressions) * 100).toFixed(1) + '%' : '—'
+
+  // Per-profile table from profiles_json if available
+  const profiles: any[] = d.profiles || []
+
+  const NETWORK_ICONS: Record<string, string> = { facebook: '👥', instagram: '📸', x: '𝕏', linkedin: '💼', youtube: '▶️', tiktok: '🎵', pinterest: '📌' }
+
   return (
     <div>
       <SecHead icon="🌱" title="Social Media (Sprout)" configured={ch.configured} />
-      {!ch.configured
-        ? <NoData msg="No Sprout Social data uploaded for this month." />
-        : !d?.platforms || Object.keys(d.platforms).length === 0
-        ? <NoData msg={ch.message || 'No social data for this period.'} />
-        : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {Object.entries(d.platforms).map(([platform, stats]) => {
-              const s = stats as Record<string, number>;
-              return (
-                <div key={platform}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span>{PLATFORM_ICONS[platform] || '📱'}</span>
-                    <span style={{ textTransform: 'capitalize' }}>{platform}</span>
-                  </div>
-                  <TileGrid>
-                    <Tile label="Posts" value={fmt(s.posts)} />
-                    <Tile label="Impressions" value={fmt(s.impressions)} />
-                    <Tile label="Engagements" value={fmt(s.engagements)} />
-                    <Tile label="Followers Gained" value={fmt(s.audience_gained)} hi={s.audience_gained > 0 ? 'good' : null} />
-                  </TileGrid>
-                </div>
-              );
-            })}
-          </div>
-        )}
+      <TileGrid>
+        <Tile label="Impressions"      value={fmt(totals.impressions)} />
+        <Tile label="Engagements"      value={fmt(totals.engagements)} />
+        <Tile label="Post Link Clicks" value={fmt(totals.post_link_clicks)} />
+        <Tile label="Engagement Rate"  value={engRate} />
+        <Tile label="Video Views"      value={fmt(totals.video_views)} />
+      </TileGrid>
+      {profiles.length > 0 ? (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-sunken)' }}>
+                {['Profile','Audience','Net Growth','Posts','Impressions','Engagements','Eng. Rate','Video Views'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '6px 10px', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {profiles.map((p: any, i: number) => {
+                const er = p.impressions > 0 ? ((p.engagements / p.impressions) * 100).toFixed(1) + '%' : '0%'
+                return (
+                  <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '6px 10px', fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                      <span style={{ marginRight: 4 }}>{NETWORK_ICONS[p.network] || '📱'}</span>{p.profile}
+                    </td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(p.audience)}</td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: p.net_audience_growth > 0 ? '#10b981' : p.net_audience_growth < 0 ? '#ef4444' : 'var(--text-muted)' }}>
+                      {p.net_audience_growth > 0 ? '+' : ''}{fmt(p.net_audience_growth)}
+                    </td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(p.posts)}</td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(p.impressions)}</td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(p.engagements)}</td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{er}</td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(p.video_views)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+          {Object.entries(d.platforms as Record<string, Record<string, number>>).map(([platform, s]) => (
+            <div key={platform} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12 }}>
+              <span>{NETWORK_ICONS[platform] || '📱'}</span>
+              <span style={{ fontWeight: 500, textTransform: 'capitalize', minWidth: 80 }}>{platform}</span>
+              <span style={{ color: 'var(--text-muted)' }}>{fmt(s.impressions)} impr · {fmt(s.engagements)} eng · {fmt(s.posts)} posts</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -425,12 +467,12 @@ export default function ReportsPage() {
   }, []);
 
   const fetchSocial = useCallback(async (clientId: string, month: string): Promise<ChannelData> => {
-    const { data, error } = await supabase
-      .from('report_data')
-      .select('platform, metric, value')
-      .eq('client_id', clientId)
-      .eq('month', month)
-      .eq('section', 'social_organic');
+    const [{ data, error }, { data: profileData }] = await Promise.all([
+      supabase.from('report_data').select('platform, metric, value')
+        .eq('client_id', clientId).eq('month', month).eq('section', 'social_organic'),
+      supabase.from('report_data').select('value')
+        .eq('client_id', clientId).eq('month', month).eq('section', 'social_profiles').eq('metric', 'profiles_json').maybeSingle(),
+    ]);
 
     if (error || !data?.length) {
       return { configured: false, message: 'No Sprout Social data for this period.', data: null };
@@ -442,7 +484,10 @@ export default function ReportsPage() {
       platforms[row.platform][row.metric] = Number(row.value) || 0;
     });
 
-    return { configured: true, data: { platforms } };
+    let profiles: any[] = []
+    try { if (profileData?.value) profiles = JSON.parse(String(profileData.value)) } catch {}
+
+    return { configured: true, data: { platforms, profiles } };
   }, [supabase]);
 
   const fetchClientData = useCallback(async (clientId: string, month: string) => {

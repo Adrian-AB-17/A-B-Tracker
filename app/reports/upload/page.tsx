@@ -123,26 +123,52 @@ export default function ReportsUploadPage() {
     const results: ParseResult[] = []
 
     if (fileType === 'profile_performance') {
-      const profileCol = headers.indexOf('Profile')
-      const networkCol = headers.indexOf('Network')
+      const profileCol    = headers.indexOf('Profile')
+      const networkCol    = headers.indexOf('Network')
+      const audienceCol   = headers.indexOf('Audience')
+      const netGrowthCol  = headers.indexOf('Net Audience Growth')
+      const gainedCol     = headers.indexOf('Audience Gained')
+      const postsCol      = headers.indexOf('Published Posts (Total)')
       const impressionsCol = headers.indexOf('Impressions')
+      const videoViewsCol = headers.indexOf('Video Views')
       const engagementsCol = headers.indexOf('Engagements')
-      const gainedCol = headers.indexOf('Audience Gained')
-      const postsCol = headers.indexOf('Published Posts (Total)')
+      const engRateCol    = headers.indexOf('Engagement Rate (per Impression)')
+      const plcCol        = headers.indexOf('Post Link Clicks')
 
+      // per-network totals
       const byClient: Record<string, Record<string, Record<string, number>>> = {}
+      // per-profile rows for profile table
+      const profileRows: Record<string, Record<string, Record<string, number>>> = {}
+
       for (let i = 1; i < lines.length; i++) {
         const cols = parseCSVLine(lines[i])
         const profile = (cols[profileCol] ?? '').trim()
         const network = (cols[networkCol] ?? '').toLowerCase().replace(/\s+/g, '_')
         const matchedClient = CLIENTS.find(c => matchesClient(profile, c.id))
         if (!matchedClient) continue
-        if (!byClient[matchedClient.id]) byClient[matchedClient.id] = {}
-        if (!byClient[matchedClient.id][network]) byClient[matchedClient.id][network] = { impressions: 0, engagements: 0, audience_gained: 0, posts: 0 }
-        byClient[matchedClient.id][network]['impressions'] += cleanNum(cols[impressionsCol])
-        byClient[matchedClient.id][network]['engagements'] += cleanNum(cols[engagementsCol])
-        byClient[matchedClient.id][network]['audience_gained'] += cleanNum(cols[gainedCol])
-        byClient[matchedClient.id][network]['posts'] += cleanNum(cols[postsCol])
+        const cid = matchedClient.id
+        if (!byClient[cid]) byClient[cid] = {}
+        if (!byClient[cid][network]) byClient[cid][network] = { impressions: 0, engagements: 0, audience_gained: 0, posts: 0, video_views: 0, post_link_clicks: 0, audience: 0, net_audience_growth: 0 }
+        byClient[cid][network]['impressions']        += cleanNum(cols[impressionsCol])
+        byClient[cid][network]['engagements']        += cleanNum(cols[engagementsCol])
+        byClient[cid][network]['audience_gained']    += cleanNum(cols[gainedCol])
+        byClient[cid][network]['posts']              += cleanNum(cols[postsCol])
+        byClient[cid][network]['video_views']        += cleanNum(cols[videoViewsCol])
+        byClient[cid][network]['post_link_clicks']   += cleanNum(cols[plcCol])
+        byClient[cid][network]['audience']            = Math.max(byClient[cid][network]['audience'], cleanNum(cols[audienceCol]))
+        byClient[cid][network]['net_audience_growth'] += cleanNum(cols[netGrowthCol])
+
+        // per-profile accumulation
+        const profileKey = `${profile}__${network}`
+        if (!profileRows[cid]) profileRows[cid] = {}
+        if (!profileRows[cid][profileKey]) profileRows[cid][profileKey] = { audience: 0, net_audience_growth: 0, posts: 0, impressions: 0, engagements: 0, video_views: 0, post_link_clicks: 0 }
+        profileRows[cid][profileKey]['audience']            = Math.max(profileRows[cid][profileKey]['audience'], cleanNum(cols[audienceCol]))
+        profileRows[cid][profileKey]['net_audience_growth'] += cleanNum(cols[netGrowthCol])
+        profileRows[cid][profileKey]['posts']               += cleanNum(cols[postsCol])
+        profileRows[cid][profileKey]['impressions']         += cleanNum(cols[impressionsCol])
+        profileRows[cid][profileKey]['engagements']         += cleanNum(cols[engagementsCol])
+        profileRows[cid][profileKey]['video_views']         += cleanNum(cols[videoViewsCol])
+        profileRows[cid][profileKey]['post_link_clicks']    += cleanNum(cols[plcCol])
       }
 
       for (const [clientId, networks] of Object.entries(byClient)) {
@@ -157,6 +183,15 @@ export default function ReportsUploadPage() {
             summary[`${network}__${metric}`] = value
             upserts.push({ client_id: clientId, month, section: 'social_organic', platform: network, metric, value, source: 'sprout_csv' })
           }
+        }
+        // Store per-profile rows as a JSON blob
+        const profiles = profileRows[clientId] || {}
+        const profileArr = Object.entries(profiles).map(([key, m]) => {
+          const [profileName, network] = key.split('__')
+          return { profile: profileName, network, ...m }
+        })
+        if (profileArr.length > 0) {
+          upserts.push({ client_id: clientId, month, section: 'social_profiles', platform: 'all', metric: 'profiles_json', value: JSON.stringify(profileArr) as any, source: 'sprout_csv' })
         }
         if (upserts.length > 0) {
           await supabase.from('report_data').upsert(upserts, { onConflict: 'client_id,month,section,platform,metric' })
