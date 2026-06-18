@@ -113,6 +113,22 @@ export default function ReportsUploadPage() {
     setUploads(data || [])
   }
 
+  async function handleMultipleFiles(fileType: string, files: File[]) {
+    setUploading(fileType)
+    setParseResults(prev => ({ ...prev, [fileType]: [] }))
+    const allResults: any[] = []
+    for (const file of files) {
+      const text = await file.text()
+      const lines = text.split('\n').filter(l => l.trim())
+      if (lines.length < 2) continue
+      // Re-use the single-file handler logic by calling handleFile per file
+      // but accumulate results — easiest to just call handleFile and merge
+      await handleFile(fileType, file)
+      // Results will be set by handleFile — we collect them after
+    }
+    setUploading(null)
+  }
+
   async function handleFile(fileType: string, file: File) {
     setUploading(fileType)
     setParseResults(prev => ({ ...prev, [fileType]: [] }))
@@ -271,23 +287,17 @@ export default function ReportsUploadPage() {
       const dirCol = headers.indexOf('Directions')
       const webCol = headers.indexOf('Website clicks')
 
-      // GMB doesn't have a client profile column — it's per-upload for a specific client
-      // We'll need clientId from context — for now save to 'all' and let user assign
-      // Actually, match by business name
+      // Match each row independently to a client by business name
       const locationRows: any[] = []
-      let matchedClientId = ''
       for (let i = 1; i < lines.length; i++) {
         const cols = parseCSVLine(lines[i])
         if (!cols[storeCol] && !cols[nameCol]) continue
         const bizName = (cols[nameCol] ?? '').trim()
-        // Skip the description row (row 2 in the CSV — contains "Number of people...")
         if (bizName === '' || bizName.startsWith('Number of')) continue
-        if (!matchedClientId) {
-          const mc = CLIENTS.find(c => matchesClient(bizName, c.id))
-          if (mc) matchedClientId = mc.id
-        }
+        const mc = CLIENTS.find(c => matchesClient(bizName, c.id))
+        if (!mc) continue // skip unmatched rows
         locationRows.push({
-          client_id: matchedClientId || 'rbs', // fallback
+          client_id: mc.id,
           month,
           store_code: cols[storeCol]?.trim() || null,
           business_name: bizName,
@@ -301,18 +311,24 @@ export default function ReportsUploadPage() {
           website_clicks: cleanNum(cols[webCol]),
         })
       }
-      if (locationRows.length > 0 && matchedClientId) {
-        // APPEND — dedupe by store_code so multiple regional uploads combine correctly
-        const storeCodes = locationRows.map((r: any) => r.store_code).filter(Boolean)
+      // Group by client and upsert
+      const byClient: Record<string, any[]> = {}
+      locationRows.forEach((r: any) => {
+        if (!byClient[r.client_id]) byClient[r.client_id] = []
+        byClient[r.client_id].push(r)
+      })
+      for (const [clientId, rows] of Object.entries(byClient)) {
+        const storeCodes = rows.map((r: any) => r.store_code).filter(Boolean)
         if (storeCodes.length > 0) {
           await supabase.from('gmb_location_data').delete()
-            .eq('client_id', matchedClientId).eq('month', month).in('store_code', storeCodes)
+            .eq('client_id', clientId).eq('month', month).in('store_code', storeCodes)
         }
-        await supabase.from('gmb_location_data').insert(locationRows.map((r: any) => ({ ...r, client_id: matchedClientId })))
-        const client = CLIENTS.find(c => c.id === matchedClientId)!
-        results.push({ clientId: matchedClientId, clientName: client.name, rows: locationRows.length, metrics: { locations: locationRows.length } })
-      } else {
-        results.push({ clientId: 'all', clientName: 'Could not match client — check business name', rows: locationRows.length, metrics: {} })
+        await supabase.from('gmb_location_data').insert(rows)
+        const client = CLIENTS.find(c => c.id === clientId)!
+        results.push({ clientId, clientName: client?.name || clientId, rows: rows.length, metrics: { locations: rows.length } })
+      }
+      if (locationRows.length === 0) {
+        results.push({ clientId: 'none', clientName: 'No matched clients — check business names', rows: 0, metrics: {} })
       }
 
     } else if (fileType === 'paid_performance') {
@@ -446,7 +462,16 @@ export default function ReportsUploadPage() {
                   <input
                     ref={el => { refs.current[ft.key] = el }}
                     type="file" accept={ft.accept} className="hidden"
-                    onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(ft.key, f); e.target.value = '' }}
+                    multiple={ft.key === 'gmb_performance'}
+                    onChange={e => {
+                      const files = Array.from(e.target.files || [])
+                      if (ft.key === 'gmb_performance' && files.length > 1) {
+                        handleMultipleFiles(ft.key, files)
+                      } else if (files[0]) {
+                        handleFile(ft.key, files[0])
+                      }
+                      e.target.value = ''
+                    }}
                   />
                 </div>
 

@@ -285,7 +285,7 @@ function GA4Section({ ch }: { ch: ChannelData | null }) {
               {d.topChannel && <Tile label="Top Channel" value={d.topChannel} />}
             </TileGrid>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {/* Traffic Channels */}
               {d.channels?.length > 0 && (
                 <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden' }}>
@@ -489,14 +489,35 @@ function SocialSection({ ch }: { ch: ChannelData | null }) {
           </table>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
-          {Object.entries(d.platforms as Record<string, Record<string, number>>).map(([platform, s]) => (
-            <div key={platform} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12 }}>
-              <span>{NETWORK_ICONS[platform] || '📱'}</span>
-              <span style={{ fontWeight: 500, textTransform: 'capitalize', minWidth: 80 }}>{platform}</span>
-              <span style={{ color: 'var(--text-muted)' }}>{fmt(s.impressions)} impr · {fmt(s.engagements)} eng · {fmt(s.posts)} posts</span>
-            </div>
-          ))}
+        <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginTop: 10 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-sunken)' }}>
+                {['Platform','Posts','Impressions','Engagements','Eng. Rate','Video Views','Followers Gained'].map((h: string) => (
+                  <th key={h} style={{ textAlign: 'left', padding: '6px 10px', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(d.platforms as Record<string, Record<string, number>>).map(([platform, s]) => {
+                const er = s.impressions > 0 ? ((s.engagements / s.impressions) * 100).toFixed(1) + '%' : '0%'
+                return (
+                  <tr key={platform} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '6px 10px', fontWeight: 500 }}>
+                      <span style={{ marginRight: 4 }}>{NETWORK_ICONS[platform] || '📱'}</span>
+                      <span style={{ textTransform: 'capitalize' }}>{platform}</span>
+                    </td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(s.posts)}</td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(s.impressions)}</td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(s.engagements)}</td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{er}</td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(s.video_views)}</td>
+                    <td style={{ padding: '6px 10px', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{fmt(s.audience_gained)}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
