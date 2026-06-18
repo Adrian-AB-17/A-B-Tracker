@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       api_key: apiKey,
       date_from: dateFrom,
       date_to: dateTo,
-      fields: 'date,datasource,account_name,account_id,campaign,impressions,clicks,spend,reach,conversions,conversion_value',
+      fields: 'date,datasource,account_name,account_id,campaign,device,impressions,clicks,spend,reach,conversions,conversion_value',
       select_accounts: `facebook__${accountId}`,
     });
 
