@@ -1072,7 +1072,7 @@ export default function ReportDashboard({
   }, [uploads])
 
   const hasData = reportData.length > 0
-  const hasMeta = metrics.metaSpend != null
+  const hasMeta = metrics.metaSpend != null || liveAds?.metaSpend != null
   const hasSocial = metrics.impressions != null
   const hasLiveAds = liveAds != null && (liveAds.metaSpend != null || liveAds.gadsSpend != null)
   const hasAnyData = hasData || hasLiveAds
@@ -1541,11 +1541,11 @@ export default function ReportDashboard({
             {hasMeta ? (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                  <KpiCard label="Total Spend" value={money(metrics.metaSpend)} color={clientColor} />
-                  <KpiCard label="Impressions" value={fmt(metrics.metaImpressions)} color={clientColor} />
-                  <KpiCard label="Clicks" value={fmt(metrics.metaClicks)} color={clientColor} />
-                  <KpiCard label="CTR" value={pct(metrics.metaCtr)} color={clientColor} />
-                  <KpiCard label="Avg CPC" value={money(metrics.metaCpc)} color={clientColor} />
+                  <KpiCard label="Total Spend" value={money(metrics.metaSpend ?? liveAds?.metaSpend)} color={clientColor} />
+                  <KpiCard label="Impressions" value={fmt(metrics.metaImpressions ?? liveAds?.metaImpressions)} color={clientColor} />
+                  <KpiCard label="Clicks" value={fmt(metrics.metaClicks ?? liveAds?.metaClicks)} color={clientColor} />
+                  <KpiCard label="CTR" value={pct(metrics.metaCtr ?? liveAds?.metaCtr)} color={clientColor} />
+                  <KpiCard label="Avg CPC" value={money(metrics.metaCpc ?? liveAds?.metaCpc)} color={clientColor} />
                 </div>
                 <div className="rounded-xl border p-5"
                   style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
