@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import PortalChannels from './PortalChannels'
 
 function monthLabel(m: string) {
   const [y, mo] = m.split('-')
@@ -165,25 +166,21 @@ export default async function PortalReportPage({
       {approvedChannels.size > 0 && (
         <div style={{ marginBottom: 24 }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: '#1a2744', marginBottom: 12 }}>⚡ Live Performance Data</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {[
+          <PortalChannels
+            clientId={clientId}
+            month={month}
+            channels={[
               { id: 'gmb',    icon: '⭐', label: 'Reputation Management' },
               { id: 'meta',   icon: '📘', label: 'Meta Ads' },
               { id: 'gads',   icon: '🔵', label: 'Google Ads' },
               { id: 'ga4',    icon: '📊', label: 'Website Performance' },
               { id: 'social', icon: '🌱', label: 'Social Media' },
               { id: 'email',  icon: '✉️',  label: 'Email Marketing' },
-            ].filter(ch => approvedChannels.has(ch.id)).map(ch => (
-              <div key={ch.id} style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: '14px 16px', background: '#fff' }}>
-                <div style={{ fontWeight: 600, fontSize: 13, color: '#1a2744', marginBottom: approvalNotes[ch.id] ? 6 : 0 }}>
-                  {ch.icon} {ch.label}
-                </div>
-                {approvalNotes[ch.id] && (
-                  <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.5 }}>{approvalNotes[ch.id]}</p>
-                )}
-              </div>
-            ))}
-          </div>
+            ]
+              .filter(ch => approvedChannels.has(ch.id))
+              .map(ch => ({ ...ch, note: approvalNotes[ch.id] || '' }))
+            }
+          />
         </div>
       )}
 
