@@ -546,8 +546,23 @@ export async function GET(req: NextRequest) {
               calls:         l.calls || 0,
               directions:    l.directions || 0,
               websiteClicks: l.website_clicks || 0,
-              areaManager:   l.area_manager || (l.store_code ? RBS_BRANCH_MAP[String(l.store_code).padStart(2,'0')]?.area_manager : null) || 'Unknown',
-              regionalVp:    l.store_code ? RBS_BRANCH_MAP[String(l.store_code).padStart(2,'0')]?.regional_vp || 'Unknown' : 'Unknown',
+              areaManager:   (() => {
+                const sc = String(l.store_code || '').replace(/^0+/,'').padStart(2,'0')
+                const byCode = RBS_BRANCH_MAP[sc]?.area_manager
+                if (byCode && byCode !== '.') return byCode
+                // fallback: match by city
+                const addrCity = (l.address || '').split(',').slice(-2,-1)[0]?.trim().toLowerCase()
+                const byCity = Object.values(RBS_BRANCH_MAP).find(b => b.city.toLowerCase() === addrCity)
+                return byCity?.area_manager || l.area_manager || 'Unknown'
+              })(),
+              regionalVp:    (() => {
+                const sc = String(l.store_code || '').replace(/^0+/,'').padStart(2,'0')
+                const byCode = RBS_BRANCH_MAP[sc]?.regional_vp
+                if (byCode && byCode !== '.') return byCode
+                const addrCity = (l.address || '').split(',').slice(-2,-1)[0]?.trim().toLowerCase()
+                const byCity = Object.values(RBS_BRANCH_MAP).find(b => b.city.toLowerCase() === addrCity)
+                return byCity?.regional_vp || 'Unknown'
+              })(),
             }
           }),
           source: 'csv',
