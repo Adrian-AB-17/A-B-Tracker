@@ -298,6 +298,26 @@ function LeadsSection({ ch }: { ch: ChannelData | null }) {
         {d.totalSignups > 0 && <Tile label="Signups" value={String(d.totalSignups)} />}
         {d.topManufacturers?.[0] && <Tile label="Top Manufacturer" value={d.topManufacturers[0].name} sub={`${d.topManufacturers[0].count} leads`} />}
       </div>
+      {d.topManufacturers?.length > 0 && (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginTop: 8 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ background: 'var(--bg-sunken)' }}>
+                <th style={{ textAlign: 'left', padding: '6px 12px', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Manufacturer</th>
+                <th style={{ textAlign: 'right', padding: '6px 12px', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Leads</th>
+              </tr>
+            </thead>
+            <tbody>
+              {d.topManufacturers.map((m: any, i: number) => (
+                <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: '6px 12px', color: 'var(--text)', fontWeight: 500 }}>{m.name}</td>
+                  <td style={{ padding: '6px 12px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600, color: 'var(--brand-navy, #1a2744)' }}>{m.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
