@@ -272,23 +272,28 @@ export async function GET(req: NextRequest) {
       users: parseFloat(r.metricValues?.[1]?.value || '0'),
       conversions: parseFloat(r.metricValues?.[2]?.value || '0'),
     }));
-    const events = (eventsData.rows || []).map((r: any) => ({
-      name: r.dimensionValues?.[0]?.value,
-      count: parseFloat(r.metricValues?.[0]?.value || '0'),
-      users: parseFloat(r.metricValues?.[1]?.value || '0'),
-    }));
+    const EXCLUDED_EVENTS = ['gtm.init', 'gtm.js', 'gtm.dom', 'gtm.click', 'gtm.init_consent', 'gtm.consent_update']
+    const events = (eventsData.rows || [])
+      .map((r: any) => ({
+        name: r.dimensionValues?.[0]?.value,
+        count: parseFloat(r.metricValues?.[0]?.value || '0'),
+        users: parseFloat(r.metricValues?.[1]?.value || '0'),
+      }))
+      .filter((e: any) => !EXCLUDED_EVENTS.includes(e.name) && !e.name?.startsWith('gtm.'));
     const devices = (devicesData.rows || []).map((r: any) => ({
       device: r.dimensionValues?.[0]?.value,
       sessions: parseFloat(r.metricValues?.[0]?.value || '0'),
       users: parseFloat(r.metricValues?.[1]?.value || '0'),
     }));
-    const topPages = (pagesData.rows || []).map((r: any) => ({
-      page: r.dimensionValues?.[0]?.value,
-      views: parseFloat(r.metricValues?.[0]?.value || '0'),
-      users: parseFloat(r.metricValues?.[1]?.value || '0'),
-      bounceRate: parseFloat(r.metricValues?.[2]?.value || '0') * 100,
-      avgDuration: parseFloat(r.metricValues?.[3]?.value || '0'),
-    }));
+    const topPages = (pagesData.rows || [])
+      .map((r: any) => ({
+        page: r.dimensionValues?.[0]?.value,
+        views: parseFloat(r.metricValues?.[0]?.value || '0'),
+        users: parseFloat(r.metricValues?.[1]?.value || '0'),
+        bounceRate: parseFloat(r.metricValues?.[2]?.value || '0') * 100,
+        avgDuration: parseFloat(r.metricValues?.[3]?.value || '0'),
+      }))
+      .filter((p: any) => p.page && !p.page.startsWith('/v/_/') && !p.page.startsWith('/_/'));
 
     return NextResponse.json({
       configured: true, clientId, month,
