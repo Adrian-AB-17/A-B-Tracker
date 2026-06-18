@@ -92,25 +92,54 @@ function renderGads(d: any) {
   )
 }
 
-function renderGmb(d: any) {
+function GmbContent({ d }: { d: any }) {
+  const [rvp, setRvp] = useState('All')
+  const rvps = ['All', ...Array.from(new Set((d.locations || []).map((l: any) => l.regionalVp).filter(Boolean))).sort() as string[]]
+  const filtered = rvp === 'All' ? (d.locations || []) : (d.locations || []).filter((l: any) => l.regionalVp === rvp)
+  const totals = filtered.reduce((a: any, l: any) => ({
+    search: a.search + (l.searchViews || 0),
+    maps: a.maps + (l.mapsViews || 0),
+    calls: a.calls + (l.calls || 0),
+    directions: a.directions + (l.directions || 0),
+    website: a.website + (l.websiteClicks || 0),
+  }), { search: 0, maps: 0, calls: 0, directions: 0, website: 0 })
+
   return (
     <div>
       <KpiGrid items={[
-        { label: 'Search Views', value: fmt(d.searchViews) },
-        { label: 'Maps Views', value: fmt(d.mapsViews) },
-        { label: 'Total Views', value: fmt(d.totalImpressions) },
-        { label: 'Calls', value: fmt(d.calls) },
-        { label: 'Directions', value: fmt(d.directions) },
-        { label: 'Website Clicks', value: fmt(d.websiteClicks) },
+        { label: 'Search Views', value: fmt(totals.search || d.searchViews) },
+        { label: 'Maps Views', value: fmt(totals.maps || d.mapsViews) },
+        { label: 'Total Views', value: fmt((totals.search || 0) + (totals.maps || 0) || d.totalImpressions) },
+        { label: 'Calls', value: fmt(totals.calls || d.calls) },
+        { label: 'Directions', value: fmt(totals.directions || d.directions) },
+        { label: 'Website Clicks', value: fmt(totals.website || d.websiteClicks) },
       ]} />
-      <DataTable title="Location Breakdown" headers={['BR#', 'Location', 'Search', 'Maps', 'Calls', 'Dir.', 'Website']}
-        rows={(d.locations || []).map((l: any) => {
+      {rvps.length > 1 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+          {rvps.map(r => (
+            <button key={r} onClick={() => setRvp(r)} style={{
+              padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              border: '1px solid #e5e7eb',
+              background: rvp === r ? '#1a2744' : '#f9fafb',
+              color: rvp === r ? '#fff' : '#374151',
+            }}>
+              {r === 'All' ? `All (${(d.locations||[]).length})` : `${r.split(' ')[0]} (${(d.locations||[]).filter((l: any) => l.regionalVp === r).length})`}
+            </button>
+          ))}
+        </div>
+      )}
+      <DataTable title="" headers={['BR#', 'Location', 'Search', 'Maps', 'Calls', 'Dir.', 'Website']}
+        rows={filtered.map((l: any) => {
           const parts = (l.address || '').split(',')
           const city = parts.length >= 3 ? `${parts[parts.length-2].trim()}, ${parts[parts.length-1].trim().split(' ')[0]}` : l.address || l.fullName
           return [`#${l.storeCode}`, city, fmt(l.searchViews), fmt(l.mapsViews), fmt(l.calls), fmt(l.directions), fmt(l.websiteClicks)]
         })} />
     </div>
   )
+}
+
+function renderGmb(d: any) {
+  return <GmbContent d={d} />
 }
 
 function renderEmail(d: any) {
