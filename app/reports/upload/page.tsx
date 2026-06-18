@@ -426,6 +426,24 @@ export default function ReportsUploadPage() {
           <div className="text-sm mt-4" style={{ color: 'var(--text-muted)' }}>
             Processing: <strong style={{ color: 'var(--text)' }}>{monthLabel(month)}</strong>
           </div>
+          <div className="mt-4">
+            <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Clear Data</label>
+            <button
+              onClick={async () => {
+                if (!confirm(`Delete ALL report data for ${monthLabel(month)}? This cannot be undone.`)) return
+                const { createClient } = await import('@/lib/supabase/client')
+                const sb = createClient()
+                await Promise.all([
+                  sb.from('report_data').delete().eq('month', month),
+                  sb.from('gmb_location_data').delete().eq('month', month),
+                ])
+                alert(`Cleared all data for ${monthLabel(month)}`)
+              }}
+              className="px-3 py-2 rounded-lg text-sm font-medium"
+              style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', cursor: 'pointer' }}>
+              🗑 Clear {monthLabel(month)}
+            </button>
+          </div>
         </div>
 
         {/* Upload zones */}
