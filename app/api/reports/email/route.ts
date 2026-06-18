@@ -121,8 +121,10 @@ export async function GET(req: NextRequest) {
         openRate:  t.sends > 0 ? parseFloat(((t.opens  / t.sends) * 100).toFixed(1)) : 0,
         clickRate: t.opens > 0 ? parseFloat(((t.clicks / t.opens) * 100).toFixed(1)) : 0,
         unsubRate: t.sends > 0 ? parseFloat(((t.unsubscribes / t.sends) * 100).toFixed(2)) : 0,
-        campaigns: campaigns.slice(0, 5).map((c: Record<string, string>) => ({
-          name:      c.name,
+        campaigns: campaigns
+          .sort((a: Record<string, string>, b: Record<string, string>) => (parseInt(b.send_amt) || 0) - (parseInt(a.send_amt) || 0))
+          .slice(0, 10).map((c: Record<string, string>) => ({
+          name:      c.subject || c.name || 'Untitled',
           subject:   c.subject,
           sentDate:  c.sdate,
           sends:     parseInt(c.send_amt)         || 0,
