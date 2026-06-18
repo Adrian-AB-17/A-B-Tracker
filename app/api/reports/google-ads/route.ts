@@ -65,20 +65,17 @@ export async function GET(req: NextRequest) {
       { impressions: 0, clicks: 0, cost: 0, conversions: 0, conversion_value: 0 }
     );
 
-    // Fetch markup from most recent WO for this client this month
+    // Fetch markup % from approval record for this client/month
     const supabase = await createClient();
-    const { data: woData } = await supabase
-      .from('work_orders')
-      .select('markup_percentage')
+    const { data: approvalRow } = await supabase
+      .from('client_report_approvals')
+      .select('markup_pct')
       .eq('client_id', clientId)
-      .gte('created_at', `${dateFrom}T00:00:00Z`)
-      .lte('created_at', `${dateTo}T23:59:59Z`)
-      .not('markup_percentage', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    const markupPct: number = Number(woData?.[0]?.markup_percentage) || 0;
-    const billedSpend: number = markupPct > 0 ? t.cost * (1 + markupPct / 100) : t.cost;
+      .eq('month', month)
+      .eq('channel', 'gads')
+      .maybeSingle();
+    const markupPct: number = approvalRow?.markup_pct ?? 30;
+    const billedSpend: number = parseFloat((t.cost * (1 + markupPct / 100)).toFixed(2));
 
     // Aggregate by account + campaign
     const campaignMap: Record<string, { cost: number; impressions: number; clicks: number; conversions: number; account: string }> = {};

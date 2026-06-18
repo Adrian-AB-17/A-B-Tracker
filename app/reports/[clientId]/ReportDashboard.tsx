@@ -420,7 +420,8 @@ function MetaTab({ clientId, month, clientColor }: { clientId: string; month: st
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <KpiCard label="Total Spend" value={m(data.spend)} color={clientColor} rawValue={data.spend} prevValue={prevData?.spend} lastYearValue={lastYearData?.spend} />
+        <KpiCard label="Raw Spend" value={m(data.spend)} color={clientColor} rawValue={data.spend} prevValue={prevData?.spend} lastYearValue={lastYearData?.spend} />
+        <KpiCard label="Billed to Client" value={m(data.billedSpend ?? data.spend)} color={clientColor} rawValue={data.billedSpend ?? data.spend} prevValue={prevData?.billedSpend} lastYearValue={lastYearData?.billedSpend} />
         <KpiCard label="Impressions" value={f(data.impressions)} color={clientColor} rawValue={data.impressions} prevValue={prevData?.impressions} lastYearValue={lastYearData?.impressions} />
         <KpiCard label="Clicks" value={f(data.clicks)} color={clientColor} rawValue={data.clicks} prevValue={prevData?.clicks} lastYearValue={lastYearData?.clicks} />
         <KpiCard label="CTR" value={p(data.ctr)} color={clientColor} rawValue={data.ctr} prevValue={prevData?.ctr} lastYearValue={lastYearData?.ctr} />
@@ -428,7 +429,6 @@ function MetaTab({ clientId, month, clientColor }: { clientId: string; month: st
         <KpiCard label="Reach" value={f(data.reach)} color={clientColor} rawValue={data.reach} prevValue={prevData?.reach} lastYearValue={lastYearData?.reach} />
         <KpiCard label="CPM" value={m(data.cpm)} color={clientColor} rawValue={data.cpm} prevValue={prevData?.cpm} lastYearValue={lastYearData?.cpm} />
         <KpiCard label="Conversions" value={f(data.conversions)} color={clientColor} rawValue={data.conversions} prevValue={prevData?.conversions} lastYearValue={lastYearData?.conversions} />
-        <KpiCard label="Conv. Value" value={m(data.conversion_value)} color={clientColor} rawValue={data.conversion_value} prevValue={prevData?.conversion_value} lastYearValue={lastYearData?.conversion_value} />
         <KpiCard label="ROAS" value={data.roas != null ? `${data.roas}x` : '—'} color={clientColor} rawValue={data.roas} prevValue={prevData?.roas} lastYearValue={lastYearData?.roas} />
       </div>
 

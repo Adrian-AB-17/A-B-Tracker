@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 
 const WINDSOR_META_ACCOUNTS: Record<string, string> = {
   'a-b-consulting-group': '954365713245',
@@ -91,10 +92,24 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.value - a.value);
 
 
+    // Look up saved markup % for this client/month
+    const supabase = await createClient();
+    const { data: approvalRow } = await supabase
+      .from('client_report_approvals')
+      .select('markup_pct')
+      .eq('client_id', clientId)
+      .eq('month', month)
+      .eq('channel', 'meta')
+      .maybeSingle();
+    const markupPct = approvalRow?.markup_pct ?? 30;
+    const billedSpend = parseFloat((t.spend * (1 + markupPct / 100)).toFixed(2));
+
     return NextResponse.json({
       configured: true, clientId, month,
       data: {
         spend:       t.spend,
+        billedSpend,
+        markupPct,
         impressions: t.impressions,
         clicks:      t.clicks,
         reach:       t.reach,
