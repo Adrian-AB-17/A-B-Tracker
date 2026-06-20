@@ -112,6 +112,22 @@ export default function SocialHubPage() {
       .gte('published_at', monthStart + 'T00:00:00')
       .lte('published_at', monthEnd + 'T23:59:59')
 
+    // Follower snapshots (from Excel uploads)
+    const monthEndDate = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0]
+    const { data: followerSnaps } = await supabase
+      .from('client_follower_snapshots')
+      .select('client_name, total_followers, net_follower_change, snapshot_month')
+      .lte('snapshot_month', monthEndDate)
+      .order('snapshot_month', { ascending: false })
+
+    // Build follower map: client_name -> most recent snapshot on or before month end
+    const followerMap: Record<string, { followers: number; growth: number }> = {}
+    for (const snap of followerSnaps ?? []) {
+      if (!followerMap[snap.client_name]) {
+        followerMap[snap.client_name] = { followers: snap.total_followers, growth: snap.net_follower_change }
+      }
+    }
+
     // Sync log
     const { data: logs } = await supabase
       .from('sprout_sync_log')
@@ -142,8 +158,15 @@ export default function SocialHubPage() {
         }
       }
       const c = clientMap[row.client_name]
-      c.total_followers = Math.max(c.total_followers, row.followers ?? 0)
-      c.net_follower_change += row.net_follower_change ?? 0
+      // Prefer snapshot data for followers; API data as fallback
+      const snap = followerMap[row.client_name]
+      if (snap) {
+        c.total_followers = snap.followers
+        c.net_follower_change = snap.growth
+      } else {
+        c.total_followers = Math.max(c.total_followers, row.followers ?? 0)
+        c.net_follower_change += row.net_follower_change ?? 0
+      }
       c.total_posts += row.posts_sent ?? 0
       if (row.network && !c.networks.includes(row.network)) c.networks.push(row.network)
     }
