@@ -82,38 +82,7 @@ export default function RBSScorecardPage() {
     const { data: scorecard } = await supabase
       .rpc('get_rbs_branch_scorecard', { month_start: monthStart, month_end: monthEnd })
 
-    // Branch directory for RVP/city/manager
-    const { data: directory } = await supabase
-      .from('rbs_branch_directory')
-      .select('store_code, location, city, state, manager, rvp')
-      .limit(200)
-
-    // Build city → dir lookup
-    const dirByCity: Record<string, { city: string; state: string; manager: string; rvp: string }> = {}
-    for (const d of directory ?? []) {
-      const key = (d.city ?? '').toLowerCase().trim()
-      if (key) dirByCity[key] = { city: d.city, state: d.state, manager: d.manager, rvp: d.rvp }
-    }
-
-    function lookupDir(displayName: string) {
-      const stripped = displayName
-        .replace('Richards Building Supply - ', '')
-        .replace('Richards Building Supply-', '')
-        .replace('Richards Building Supply', '')
-        .trim()
-      // Remove state suffix: "West Allis, WI" → "west allis"
-      const cityPart = stripped.replace(/,\s*[A-Z]{2}$/, '').trim().toLowerCase()
-      // Direct match
-      if (dirByCity[cityPart]) return dirByCity[cityPart]
-      // Partial match
-      const found = Object.entries(dirByCity).find(([k]) =>
-        k.includes(cityPart) || cityPart.includes(k)
-      )
-      return found ? found[1] : { city: stripped, state: '', manager: '', rvp: '' }
-    }
-
     const branchList: Branch[] = (scorecard ?? []).map((row: any) => {
-      const dir = lookupDir(row.display_name)
       const name = shortName(row.display_name)
       const isColorado = COLORADO.some(c => row.display_name.includes(c))
       const avg = Number(row.avg_eng) || 0
@@ -123,10 +92,10 @@ export default function RBSScorecardPage() {
         profile_id: row.profile_id,
         display_name: row.display_name,
         short_name: name,
-        city: dir.city || name,
-        state: dir.state || '',
-        rvp: dir.rvp || '',
-        manager: dir.manager || '',
+        city: row.city || name,
+        state: row.state || '',
+        rvp: row.rvp || '',
+        manager: row.manager || '',
         posts,
         engagements: Number(row.engagements) || 0,
         avg_eng: avg,
