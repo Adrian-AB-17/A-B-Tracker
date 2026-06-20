@@ -76,22 +76,9 @@ export default function RBSScorecardPage() {
     const monthStart = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0]
     const monthEnd = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0]
 
-    // All RBS Facebook profiles - distinct by profile_id
-    const { data: profilesRaw } = await supabase
-      .from('sprout_profiles')
-      .select('profile_id, display_name')
-      .eq('client_name', 'Richards Building Supply')
-      .eq('network', 'facebook')
-      .order('display_name')
-      .limit(2000)
-
-    // Deduplicate by profile_id
-    const seen = new Set<string>()
-    const profiles = (profilesRaw ?? []).filter(p => {
-      if (seen.has(p.profile_id)) return false
-      seen.add(p.profile_id)
-      return true
-    })
+    // All RBS Facebook profiles - distinct via RPC
+    const { data: profiles } = await supabase
+      .rpc('get_rbs_facebook_profiles')
 
     // Branch directory for location/manager/RVP
     const { data: directory } = await supabase
@@ -136,7 +123,7 @@ export default function RBSScorecardPage() {
 
     const COLORADO = ['52nd Ave, CO', 'Colorado Springs, CO', 'Loveland, CO', 'York Street, CO']
 
-    const branchList: Branch[] = (profiles ?? []).map(p => {
+    const branchList: Branch[] = (profiles ?? []).map((p: any) => {
       const stats = postMap[p.profile_id] ?? { count: 0, eng: 0, zero: 0 }
       const dir = lookupBranch(p.display_name)
       const name = shortName(p.display_name)
