@@ -15,100 +15,63 @@ const HEADERS = {
   'Content-Type': 'application/json',
 }
 
-// Profile ID → client name mapping
-// Run /api/sprout/profiles first to discover all profile IDs, then fill this in
-// Or we auto-map from display_name patterns
-const CLIENT_MAP: Record<string, string> = {
-  // Will be populated after first profiles call
+function inferClientName(name: string): string {
+  const n = (name || '').toLowerCase()
+  if (n.includes('richards')) return 'Richards Building Supply'
+  if (n.includes('culture construction')) return 'Culture Construction'
+  if (n.includes('kbc exterior') || n.includes('kennedy')) return 'KBC Exteriors'
+  if (n.includes('k.b.c') || n.includes('kb construction')) return 'KBC Exteriors'
+  if (n.includes('mvp') || n.includes('chiro')) return 'MVP Chiropractic'
+  if (n.includes('midwest construction')) return 'Midwest Construction Experts'
+  if (n.includes('apollo supply')) return 'Apollo Supply'
+  if (n.includes('midway windows')) return 'Midway Windows'
+  if (n.includes('affiliated control')) return 'Affiliated Control Equipment'
+  if (n.includes('nico roofing') || n.includes('nico exterior')) return 'NICO Roofing'
+  if (n.includes('a&b consulting') || n.includes('ab consulting') || n.includes('abconsulting')) return 'A&B Consulting Group'
+  if (n.includes('apek')) return 'APEK Inc.'
+  if (n.includes('rg general') || n.includes('rg roofing')) return 'RG General Roofing'
+  return name || 'Unknown'
 }
 
-function inferClientName(displayName: string, username: string): string {
-  const name = (displayName || username || '').toLowerCase()
-  if (name.includes('richards') || name.includes('rbs')) return 'Richards Building Supply'
-  if (name.includes('culture')) return 'Culture Construction'
-  if (name.includes('kbc')) return 'KBC Exteriors'
-  if (name.includes('mvp') || name.includes('chiro')) return 'MVP Chiropractic'
-  if (name.includes('midwest')) return 'Midwest Construction Experts'
-  if (name.includes('apollo')) return 'Apollo Supply'
-  if (name.includes('midway')) return 'Midway Windows'
-  if (name.includes('affiliated') || name.includes('apek') || name.includes('ace')) return 'Affiliated Control Equipment'
-  if (name.includes('nico') || name.includes('nico roofing')) return 'NICO Roofing'
-  if (name.includes('a&b') || name.includes('ab consulting')) return 'A&B Consulting Group'
-  if (name.includes('apek')) return 'APEK Inc.'
-  if (name.includes('rg general') || name.includes('rg roofing')) return 'RG General Roofing'
-  return displayName || username || 'Unknown'
+async function fetchAllProfiles() {
+  const res = await fetch(`${SPROUT_BASE}/metadata/customer`, { headers: HEADERS })
+  if (!res.ok) throw new Error(`Metadata failed: ${res.status} ${await res.text()}`)
+  const data = await res.json()
+  return (data.data ?? []) as Array<{ customer_profile_id: number; network_type: string; name: string; native_id: string }>
 }
 
-async function fetchProfiles() {
-  const res = await fetch(`${SPROUT_BASE}/metadata/customer`, {
-    headers: HEADERS,
-  })
-  if (!res.ok) throw new Error(`Profiles metadata failed: ${res.status} ${await res.text()}`)
-  return res.json()
-}
-
-async function fetchProfileAnalytics(profileIds: string[], startDate: string, endDate: string) {
+async function fetchProfileAnalytics(sproutProfileIds: number[], startDate: string, endDate: string, page = 1) {
   const body = {
-    filters: {
-      customer_profile_id: profileIds,
-      reporting_period: {
-        type: 'custom',
-        date_range: { start: startDate, end: endDate },
-      },
-    },
-    metrics: [
-      'lifetime.followers.count',
-      'lifetime.following.count',
-      'net_follower.count',
-      'impressions.count',
-      'engagements.count',
-      'posts_sent.count',
+    filters: [
+      `customer_profile_id.eq(${sproutProfileIds.join(',')})`,
+      `reporting_period.in(${startDate}...${endDate})`,
     ],
-    dimensions: ['reported_date'],
+    metrics: ['lifetime.followers.count', 'lifetime.following.count', 'net_follower.count', 'impressions.count', 'engagements.count', 'posts_sent.count'],
+    page,
   }
-  const res = await fetch(`${SPROUT_BASE}/analytics/profiles`, {
-    method: 'POST',
-    headers: HEADERS,
-    body: JSON.stringify(body),
-  })
+  const res = await fetch(`${SPROUT_BASE}/analytics/profiles`, { method: 'POST', headers: HEADERS, body: JSON.stringify(body) })
   if (!res.ok) throw new Error(`Profile analytics failed: ${res.status} ${await res.text()}`)
   return res.json()
 }
 
-async function fetchPostAnalytics(profileIds: string[], startDate: string, endDate: string, page = 1) {
+async function fetchPostAnalytics(sproutProfileIds: number[], startDate: string, endDate: string, page = 1) {
   const body = {
-    filters: {
-      customer_profile_id: profileIds,
-      reporting_period: {
-        type: 'custom',
-        date_range: { start: startDate, end: endDate },
-      },
-    },
-    metrics: [
-      'lifetime.impressions.count',
-      'lifetime.engagements.count',
-      'lifetime.reactions.count',
-      'lifetime.comments.count',
-      'lifetime.shares.count',
-      'lifetime.clicks.count',
-      'lifetime.video_views.count',
-      'lifetime.reach.count',
+    filters: [
+      `customer_profile_id.eq(${sproutProfileIds.join(',')})`,
+      `created_time.in(${startDate}T00:00:00...${endDate}T23:59:59)`,
     ],
+    fields: ['created_time', 'perma_link', 'text', 'post_type', 'customer_profile_id'],
+    metrics: ['lifetime.impressions', 'lifetime.engagements', 'lifetime.reactions', 'lifetime.comments', 'lifetime.shares', 'lifetime.clicks', 'lifetime.video_views', 'lifetime.reach'],
+    timezone: 'America/Chicago',
     page,
-    per_page: 100,
+    limit: 50,
   }
-  const res = await fetch(`${SPROUT_BASE}/analytics/posts`, {
-    method: 'POST',
-    headers: HEADERS,
-    body: JSON.stringify(body),
-  })
+  const res = await fetch(`${SPROUT_BASE}/analytics/posts`, { method: 'POST', headers: HEADERS, body: JSON.stringify(body) })
   if (!res.ok) throw new Error(`Post analytics failed: ${res.status} ${await res.text()}`)
   return res.json()
 }
 
 export async function POST(req: NextRequest) {
-  // Allow internal cron or manual trigger with a secret
-  // Auth: only enforce if CRON_SECRET is explicitly set and non-empty
   const cronSecret = (process.env.CRON_SECRET || '').trim()
   if (cronSecret) {
     const authHeader = req.headers.get('authorization') || ''
@@ -122,149 +85,108 @@ export async function POST(req: NextRequest) {
   const endDate = new Date()
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - days)
-
   const startStr = startDate.toISOString().split('T')[0]
   const endStr = endDate.toISOString().split('T')[0]
 
   let profilesUpserted = 0
   let postsUpserted = 0
-  let errorMessage: string | null = null
 
   try {
-    // 1. Get all profiles
-    const profilesMeta = await fetchProfiles()
-    const profiles = profilesMeta.data ?? []
+    const allProfiles = await fetchAllProfiles()
+    const SKIP_NETWORKS = ['yelp', 'google_my_business', 'tiktok', 'pinterest']
 
-    // Build profile_id → client name map
-    const profileClientMap: Record<string, { clientName: string; network: string; username: string; displayName: string }> = {}
-    for (const p of profiles) {
-      const clientName = CLIENT_MAP[p.id] ?? inferClientName(p.name ?? '', p.native_id ?? '')
-      profileClientMap[p.id] = {
-        clientName,
-        network: p.network_type ?? 'unknown',
-        username: p.native_id ?? '',
-        displayName: p.name ?? '',
+    const profileMap: Record<number, { clientName: string; network: string; username: string; displayName: string }> = {}
+    for (const p of allProfiles) {
+      if (SKIP_NETWORKS.includes(p.network_type)) continue
+      profileMap[p.customer_profile_id] = {
+        clientName: inferClientName(p.name),
+        network: p.network_type,
+        username: p.native_id,
+        displayName: p.name,
       }
     }
 
-    const profileIds = Object.keys(profileClientMap)
-    if (profileIds.length === 0) throw new Error('No profiles found')
+    const allIds = Object.keys(profileMap).map(Number)
+    const BATCH = 100
 
-    // 2. Fetch profile-level analytics in batches of 20
-    const BATCH = 20
-    for (let i = 0; i < profileIds.length; i += BATCH) {
-      const batch = profileIds.slice(i, i + BATCH)
-      const analytics = await fetchProfileAnalytics(batch, startStr, endStr)
-      const rows = analytics.data ?? []
-
-      for (const row of rows) {
-        const meta = profileClientMap[row.dimensions?.profile_id ?? row.profile_id]
-        if (!meta) continue
-
-        const upsertRow = {
-          profile_id: row.dimensions?.profile_id ?? row.profile_id,
-          client_name: meta.clientName,
-          network: meta.network,
-          username: meta.username,
-          display_name: meta.displayName,
-          reported_date: row.dimensions?.reported_date ?? row.reported_date,
-          followers: row.metrics?.['lifetime.followers.count'] ?? 0,
-          following: row.metrics?.['lifetime.following.count'] ?? 0,
-          net_follower_change: row.metrics?.['net_follower.count'] ?? 0,
-          impressions: row.metrics?.['impressions.count'] ?? 0,
-          engagements: row.metrics?.['engagements.count'] ?? 0,
-          posts_sent: row.metrics?.['posts_sent.count'] ?? 0,
-          updated_at: new Date().toISOString(),
+    // Profile analytics
+    for (let i = 0; i < allIds.length; i += BATCH) {
+      const batch = allIds.slice(i, i + BATCH)
+      let page = 1, hasMore = true
+      while (hasMore) {
+        const resp = await fetchProfileAnalytics(batch, startStr, endStr, page)
+        const rows = resp.data ?? []
+        if (!rows.length) break
+        for (const row of rows) {
+          const pid = row.dimensions?.['customer_profile_id'] as number
+          const meta = profileMap[pid]
+          const reportedDate = row.dimensions?.['reporting_period.by(day)']
+          if (!meta || !pid || !reportedDate) continue
+          await supabase.from('sprout_profiles').upsert({
+            profile_id: String(pid), client_name: meta.clientName, network: meta.network,
+            username: meta.username, display_name: meta.displayName, reported_date: reportedDate,
+            followers: row.metrics?.['lifetime.followers.count'] ?? 0,
+            following: row.metrics?.['lifetime.following.count'] ?? 0,
+            net_follower_change: row.metrics?.['net_follower.count'] ?? 0,
+            impressions: row.metrics?.['impressions.count'] ?? 0,
+            engagements: row.metrics?.['engagements.count'] ?? 0,
+            posts_sent: row.metrics?.['posts_sent.count'] ?? 0,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'profile_id,reported_date' })
+          profilesUpserted++
         }
-
-        await supabase.from('sprout_profiles').upsert(upsertRow, {
-          onConflict: 'profile_id,reported_date',
-        })
-        profilesUpserted++
+        hasMore = (resp.paging?.current_page ?? page) < (resp.paging?.total_pages ?? 1)
+        page++
+        if (page > 30) break
       }
     }
 
-    // 3. Fetch post analytics (paginated)
-    let page = 1
-    let hasMore = true
-    while (hasMore) {
-      const postData = await fetchPostAnalytics(profileIds, startStr, endStr, page)
-      const posts = postData.data ?? []
-      if (posts.length === 0) { hasMore = false; break }
-
-      for (const post of posts) {
-        const meta = profileClientMap[post.profile_id]
-        const upsertRow = {
-          post_id: post.id ?? post.post_id,
-          profile_id: post.profile_id,
-          client_name: meta?.clientName ?? inferClientName(post.profile_name ?? '', ''),
-          network: meta?.network ?? post.network_type ?? 'unknown',
-          post_type: post.post_type ?? post.content_type ?? null,
-          published_at: post.sent_time ?? post.created_time ?? null,
-          text_content: post.text ?? null,
-          permalink: post.permalink ?? null,
-          impressions: post.metrics?.['lifetime.impressions.count'] ?? 0,
-          reach: post.metrics?.['lifetime.reach.count'] ?? 0,
-          engagements: post.metrics?.['lifetime.engagements.count'] ?? 0,
-          reactions: post.metrics?.['lifetime.reactions.count'] ?? 0,
-          comments: post.metrics?.['lifetime.comments.count'] ?? 0,
-          shares: post.metrics?.['lifetime.shares.count'] ?? 0,
-          clicks: post.metrics?.['lifetime.clicks.count'] ?? 0,
-          video_views: post.metrics?.['lifetime.video_views.count'] ?? 0,
-          tags: post.tags ?? [],
-          updated_at: new Date().toISOString(),
+    // Post analytics
+    for (let i = 0; i < allIds.length; i += BATCH) {
+      const batch = allIds.slice(i, i + BATCH)
+      let page = 1, hasMore = true
+      while (hasMore) {
+        const resp = await fetchPostAnalytics(batch, startStr, endStr, page)
+        const posts = resp.data ?? []
+        if (!posts.length) break
+        for (const post of posts) {
+          const pid = post.customer_profile_id as number
+          const meta = profileMap[pid]
+          const postId = post.guid ?? post.id
+          if (!postId) continue
+          await supabase.from('sprout_posts').upsert({
+            post_id: String(postId), profile_id: String(pid ?? ''),
+            client_name: meta?.clientName ?? 'Unknown', network: meta?.network ?? 'unknown',
+            post_type: post.post_type ?? null, published_at: post.created_time ?? null,
+            text_content: post.text ?? null, permalink: post.perma_link ?? null,
+            impressions: post.metrics?.['lifetime.impressions'] ?? 0,
+            reach: post.metrics?.['lifetime.reach'] ?? 0,
+            engagements: post.metrics?.['lifetime.engagements'] ?? 0,
+            reactions: post.metrics?.['lifetime.reactions'] ?? 0,
+            comments: post.metrics?.['lifetime.comments'] ?? 0,
+            shares: post.metrics?.['lifetime.shares'] ?? 0,
+            clicks: post.metrics?.['lifetime.clicks'] ?? 0,
+            video_views: post.metrics?.['lifetime.video_views'] ?? 0,
+            tags: [], updated_at: new Date().toISOString(),
+          }, { onConflict: 'post_id' })
+          postsUpserted++
         }
-
-        await supabase.from('sprout_posts').upsert(upsertRow, {
-          onConflict: 'post_id',
-        })
-        postsUpserted++
+        hasMore = (resp.paging?.current_page ?? page) < (resp.paging?.total_pages ?? 1)
+        page++
+        if (page > 100) break
       }
-
-      // Check if there are more pages
-      const total = postData.paging?.total ?? 0
-      hasMore = page * 100 < total
-      page++
-
-      // Safety cap
-      if (page > 20) break
     }
 
-    // 4. Log the sync
-    await supabase.from('sprout_sync_log').insert({
-      profiles_upserted: profilesUpserted,
-      posts_upserted: postsUpserted,
-      date_range_start: startStr,
-      date_range_end: endStr,
-      status: 'success',
-    })
+    await supabase.from('sprout_sync_log').insert({ profiles_upserted: profilesUpserted, posts_upserted: postsUpserted, date_range_start: startStr, date_range_end: endStr, status: 'success' })
+    return NextResponse.json({ success: true, profiles_upserted: profilesUpserted, posts_upserted: postsUpserted, date_range: { start: startStr, end: endStr } })
 
-    return NextResponse.json({
-      success: true,
-      profiles_upserted: profilesUpserted,
-      posts_upserted: postsUpserted,
-      date_range: { start: startStr, end: endStr },
-    })
   } catch (err: any) {
-    errorMessage = err.message
-    await supabase.from('sprout_sync_log').insert({
-      profiles_upserted: profilesUpserted,
-      posts_upserted: postsUpserted,
-      date_range_start: startStr,
-      date_range_end: endStr,
-      status: 'error',
-      error_message: errorMessage,
-    })
-    return NextResponse.json({ error: errorMessage }, { status: 500 })
+    await supabase.from('sprout_sync_log').insert({ profiles_upserted: profilesUpserted, posts_upserted: postsUpserted, date_range_start: startStr, date_range_end: endStr, status: 'error', error_message: err.message })
+    return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
 
-// GET = manual trigger from browser / status check
 export async function GET() {
-  const { data: logs } = await supabase
-    .from('sprout_sync_log')
-    .select('*')
-    .order('synced_at', { ascending: false })
-    .limit(5)
+  const { data: logs } = await supabase.from('sprout_sync_log').select('*').order('synced_at', { ascending: false }).limit(5)
   return NextResponse.json({ logs })
 }
