@@ -153,8 +153,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Post analytics
-    for (let i = 0; i < allIds.length; i += BATCH) {
+    // Post analytics in batches of 10
+    for (let i = 0; i < allIds.length; i += 10) {
       const batch = allIds.slice(i, i + 10)
       let page = 1, hasMore = true
       while (hasMore) {
