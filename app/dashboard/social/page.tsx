@@ -80,7 +80,7 @@ function MiniSparkbar({ values, color }: { values: number[], color: string }) {
 
 export default function SocialHubPage() {
   const now = new Date()
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth())
+  const [selectedMonth, setSelectedMonth] = useState((now.getMonth() + 1) % 12)
   const [selectedYear] = useState(now.getFullYear())
   const [clients, setClients] = useState<ClientStat[]>([])
   const [agg, setAgg] = useState<AggregateStat | null>(null)
@@ -252,7 +252,7 @@ export default function SocialHubPage() {
     setSyncing(false)
   }
 
-  const currentMonth = now.getMonth()
+  const currentMonth = (now.getMonth() + 1) % 12
   const months3 = [-2, -1, 0].map(offset => {
     const m = (currentMonth + offset + 12) % 12
     return { label: MONTH_LABELS[m], value: m }
@@ -344,6 +344,14 @@ export default function SocialHubPage() {
           <a href="/dashboard/social/rbs" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', background: 'white', border: '1px solid #E7E5E4', borderRadius: 8, textDecoration: 'none', color: '#1C1917', fontSize: 14, fontWeight: 500 }}>
             <span style={{ fontSize: 18 }}>🏗</span>
             <div><div style={{ fontWeight: 600 }}>RBS Branch Scorecard</div><div style={{ fontSize: 12, color: '#78716C' }}>47 branches · performance by RVP</div></div>
+          </a>
+          <a href="/dashboard/social/captions" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', background: 'white', border: '1px solid #E7E5E4', borderRadius: 8, textDecoration: 'none', color: '#1C1917', fontSize: 14, fontWeight: 500 }}>
+            <span style={{ fontSize: 18 }}>✍️</span>
+            <div><div style={{ fontWeight: 600 }}>Caption Library</div><div style={{ fontSize: 12, color: '#78716C' }}>Approved captions · Draft with Claude</div></div>
+          </a>
+          <a href="/dashboard/social/goals" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', background: 'white', border: '1px solid #E7E5E4', borderRadius: 8, textDecoration: 'none', color: '#1C1917', fontSize: 14, fontWeight: 500 }}>
+            <span style={{ fontSize: 18 }}>🎯</span>
+            <div><div style={{ fontWeight: 600 }}>Q3 Goals</div><div style={{ fontSize: 12, color: '#78716C' }}>6 targets · Emily's Q3 2026</div></div>
           </a>
         </div>
 

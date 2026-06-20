@@ -56,7 +56,7 @@ export default function ClientSocialPage() {
   const clientName = decodeURIComponent(params.client as string)
 
   const now = new Date()
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth())
+  const [selectedMonth, setSelectedMonth] = useState((now.getMonth() + 1) % 12)
   const [selectedYear] = useState(now.getFullYear())
   const [kpi, setKpi] = useState<KPI | null>(null)
   const [topPosts, setTopPosts] = useState<Post[]>([])
@@ -64,7 +64,7 @@ export default function ClientSocialPage() {
   const [trend, setTrend] = useState<MonthStat[]>([])
   const [loading, setLoading] = useState(true)
 
-  const currentMonth = now.getMonth()
+  const currentMonth = (now.getMonth() + 1) % 12
   const months3 = [-2, -1, 0].map(offset => {
     const m = (currentMonth + offset + 12) % 12
     return { label: MONTH_LABELS[m], value: m }

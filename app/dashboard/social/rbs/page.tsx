@@ -56,7 +56,7 @@ const COLORADO = ['52nd Ave', 'Colorado Springs', 'Loveland', 'York Street']
 
 export default function RBSScorecardPage() {
   const now = new Date()
-  const currentMonth = now.getMonth()
+  const currentMonth = (now.getMonth() + 1) % 12
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   const [selectedYear] = useState(now.getFullYear())
   const [branches, setBranches] = useState<Branch[]>([])
