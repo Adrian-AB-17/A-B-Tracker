@@ -229,8 +229,9 @@ export default function SocialHubPage() {
     setSyncing(false)
   }
 
+  const currentMonth = now.getMonth()
   const months3 = [-2, -1, 0].map(offset => {
-    const m = (selectedMonth + offset + 12) % 12
+    const m = (currentMonth + offset + 12) % 12
     return { label: MONTH_LABELS[m], value: m }
   })
 
