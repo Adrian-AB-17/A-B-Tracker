@@ -83,6 +83,7 @@ export default function RBSScorecardPage() {
       .eq('client_name', 'Richards Building Supply')
       .eq('network', 'facebook')
       .order('display_name')
+      .limit(2000)
 
     // Deduplicate by profile_id
     const seen = new Set<string>()
@@ -96,6 +97,7 @@ export default function RBSScorecardPage() {
     const { data: directory } = await supabase
       .from('rbs_branch_directory')
       .select('store_code, location, city, state, manager, rvp')
+      .limit(200)
 
     // Posts for the month grouped by profile
     const { data: posts } = await supabase
@@ -104,6 +106,7 @@ export default function RBSScorecardPage() {
       .eq('client_name', 'Richards Building Supply')
       .gte('published_at', monthStart + 'T00:00:00')
       .lte('published_at', monthEnd + 'T23:59:59')
+      .limit(5000)
 
     // Build profile → post stats map
     const postMap: Record<string, { count: number; eng: number; zero: number }> = {}
