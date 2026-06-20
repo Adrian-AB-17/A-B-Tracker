@@ -94,10 +94,18 @@ export async function POST(req: NextRequest) {
   try {
     const allProfiles = await fetchAllProfiles()
     const SKIP_NETWORKS = ['yelp', 'google_my_business', 'tiktok', 'pinterest']
+    const SKIP_NAMES = [
+      'three stories', 'midwest gaming', 'relentless construction', 'dirtbags',
+      'northshore agribusiness', 'aluminight', 'fresh air experts', 'capri',
+      'emily l2598', 'no dam problem', 'smith mountain', 'franos roofing',
+      'adrian cardona', 'northshore', 'kennedy brother', 'k.b. construction',
+    ]
 
     const profileMap: Record<number, { clientName: string; network: string; username: string; displayName: string }> = {}
     for (const p of allProfiles) {
       if (SKIP_NETWORKS.includes(p.network_type)) continue
+      const nameLower = (p.name || '').toLowerCase()
+      if (SKIP_NAMES.some(s => nameLower.includes(s))) continue
       profileMap[p.customer_profile_id] = {
         clientName: inferClientName(p.name),
         network: p.network_type,
@@ -147,7 +155,7 @@ export async function POST(req: NextRequest) {
 
     // Post analytics
     for (let i = 0; i < allIds.length; i += BATCH) {
-      const batch = allIds.slice(i, i + BATCH)
+      const batch = allIds.slice(i, i + 10)
       let page = 1, hasMore = true
       while (hasMore) {
         const resp = await fetchPostAnalytics(batch, startStr, endStr, page)
