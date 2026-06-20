@@ -76,13 +76,21 @@ export default function RBSScorecardPage() {
     const monthStart = new Date(selectedYear, selectedMonth, 1).toISOString().split('T')[0]
     const monthEnd = new Date(selectedYear, selectedMonth + 1, 0).toISOString().split('T')[0]
 
-    // All RBS Facebook profiles
-    const { data: profiles } = await supabase
+    // All RBS Facebook profiles - distinct by profile_id
+    const { data: profilesRaw } = await supabase
       .from('sprout_profiles')
       .select('profile_id, display_name')
       .eq('client_name', 'Richards Building Supply')
       .eq('network', 'facebook')
       .order('display_name')
+
+    // Deduplicate by profile_id
+    const seen = new Set<string>()
+    const profiles = (profilesRaw ?? []).filter(p => {
+      if (seen.has(p.profile_id)) return false
+      seen.add(p.profile_id)
+      return true
+    })
 
     // Branch directory for location/manager/RVP
     const { data: directory } = await supabase
