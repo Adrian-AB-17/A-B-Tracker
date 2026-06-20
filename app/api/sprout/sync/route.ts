@@ -49,7 +49,13 @@ async function fetchProfiles() {
 
 async function fetchProfileAnalytics(profileIds: string[], startDate: string, endDate: string) {
   const body = {
-    filters: profileIds,
+    filters: {
+      customer_profile_id: profileIds,
+      reporting_period: {
+        type: 'custom',
+        date_range: { start: startDate, end: endDate },
+      },
+    },
     metrics: [
       'lifetime.followers.count',
       'lifetime.following.count',
@@ -59,8 +65,6 @@ async function fetchProfileAnalytics(profileIds: string[], startDate: string, en
       'posts_sent.count',
     ],
     dimensions: ['reported_date'],
-    start_time: `${startDate}T00:00:00`,
-    end_time: `${endDate}T23:59:59`,
   }
   const res = await fetch(`${SPROUT_BASE}/analytics/profiles`, {
     method: 'POST',
@@ -73,7 +77,13 @@ async function fetchProfileAnalytics(profileIds: string[], startDate: string, en
 
 async function fetchPostAnalytics(profileIds: string[], startDate: string, endDate: string, page = 1) {
   const body = {
-    filters: profileIds,
+    filters: {
+      customer_profile_id: profileIds,
+      reporting_period: {
+        type: 'custom',
+        date_range: { start: startDate, end: endDate },
+      },
+    },
     metrics: [
       'lifetime.impressions.count',
       'lifetime.engagements.count',
@@ -86,8 +96,6 @@ async function fetchPostAnalytics(profileIds: string[], startDate: string, endDa
     ],
     page,
     per_page: 100,
-    start_time: `${startDate}T00:00:00`,
-    end_time: `${endDate}T23:59:59`,
   }
   const res = await fetch(`${SPROUT_BASE}/analytics/posts`, {
     method: 'POST',
