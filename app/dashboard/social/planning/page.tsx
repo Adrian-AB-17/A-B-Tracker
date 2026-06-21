@@ -77,6 +77,9 @@ export default function PlanningBoardPage() {
   const [loading, setLoading] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null) // 'type-index'
   const [saving, setSaving] = useState(false)
+  const [showExport, setShowExport] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [showEmail, setShowEmail] = useState(false)
 
   const months3 = [-2, -1, 0].map(offset => {
     const m = (currentMonth + offset + 12) % 12
@@ -141,6 +144,52 @@ export default function PlanningBoardPage() {
   }
 
   function allSlots() { return [...postSlots, ...videoSlots, ...repostSlots] }
+
+  function generateEmail(): string {
+    const monthName = MONTH_LABELS[selectedMonth] + ' ' + selectedYear
+    const clientFirst = selectedClient.split(' ')[0]
+
+    function formatSlots(slots: Slot[], label: string): string {
+      const filled = slots.filter(s => s.topic || s.caption_text)
+      if (!filled.length) return ''
+      let out = `(${filled.length} ${label})\n`
+      filled.forEach((s, i) => {
+        const num = i + 1
+        const date = s.scheduled_date ? new Date(s.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '(date TBD)'
+        out += `\n(${label.replace(/s$/, '')} ${num}) ${date}: ${s.topic}\n`
+        if (s.caption_text) out += `Main Content: ${s.caption_text}\n`
+        if (s.hashtags) out += `#: ${s.hashtags}\n`
+      })
+      return out
+    }
+
+    const posts = formatSlots(postSlots, 'Posts')
+    const reposts = formatSlots(repostSlots, 'Re-Posts')
+    const videos = formatSlots(videoSlots, 'Videos')
+    const total = allSlots().filter(s => s.topic || s.caption_text).length
+
+    return `Hello,
+
+Here are the social media posts planned for ${monthName}. Please let me know if you have any feedback or if you're happy to approve them as they are.
+
+Additionally, if you have any specific content requests for the following month, feel free to share those when you have a chance so we can plan accordingly.
+
+FINAL - ${selectedClient} (${monthName})
+Calendar: ${total} Post
+
+${posts}
+${reposts}
+${videos}
+--
+
+EMILY LISOWSKI
+AB CONSULTING
+
+(708) 377 - 5727
+emily@abconsultingg.com
+www.abconsultingg.com
+52 River St. Lemont, IL 60439`
+  }
 
   function updateSlot(type: string, idx: number, updates: Partial<Slot>) {
     if (type === 'Post') setPostSlots(prev => prev.map((s, i) => i === idx ? { ...s, ...updates } : s))
@@ -370,6 +419,8 @@ export default function PlanningBoardPage() {
     )
   }
 
+
+
   return (
     <div style={{ minHeight: '100vh', background: '#FAFAF9', color: ink, fontFamily: "'Inter', system-ui, sans-serif" }}>
       <header style={{ borderBottom: `1px solid ${rule}` }}>
@@ -383,6 +434,10 @@ export default function PlanningBoardPage() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <button onClick={() => setShowExport(true)}
+              style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #E7E5E4', background: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+              📤 Export email
+            </button>
             <select value={selectedClient} onChange={e => setSelectedClient(e.target.value)}
               style={{ padding: '7px 10px', borderRadius: 6, border: `1px solid ${rule}`, fontSize: 13, background: 'white', fontWeight: 500 }}>
               {CLIENTS.map(c => <option key={c}>{c}</option>)}
@@ -396,11 +451,37 @@ export default function PlanningBoardPage() {
                 }}>{m.label}</button>
               ))}
             </div>
+            <button onClick={() => setShowEmail(true)}
+              style={{ padding: '7px 14px', borderRadius: 6, border: `1px solid ${rule}`, background: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              ✉ Generate approval email
+            </button>
           </div>
         </div>
       </header>
 
       <main style={{ maxWidth: 1300, margin: '0 auto', padding: '24px 24px' }}>
+      
+      {/* Export Modal */}
+      {showExport && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div style={{ background: 'white', borderRadius: 12, padding: 28, width: '100%', maxWidth: 700, maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Approval Email</h2>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => { navigator.clipboard.writeText(generateEmail()); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+                  style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #E7E5E4', background: copied ? '#EAF3DE' : 'white', fontSize: 13, cursor: 'pointer', color: copied ? '#047857' : '#1C1917' }}>
+                  {copied ? '✓ Copied' : 'Copy'}
+                </button>
+                <button onClick={() => setShowExport(false)}
+                  style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: '#78716C' }}>✕</button>
+              </div>
+            </div>
+            <pre style={{ background: '#FAFAF9', borderRadius: 8, padding: 16, fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap', border: '1px solid #E7E5E4', fontFamily: 'inherit', margin: 0 }}>
+              {generateEmail()}
+            </pre>
+          </div>
+        </div>
+      )}
 
         {/* Workflow legend */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -440,6 +521,31 @@ export default function PlanningBoardPage() {
           </div>
         )}
       </main>
+
+      {/* Email export modal */}
+      {showEmail && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+          <div style={{ background: 'white', borderRadius: 12, padding: 28, width: '100%', maxWidth: 680, maxHeight: '88vh', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600 }}>Approval Email — {selectedClient}</h2>
+              <button onClick={() => setShowEmail(false)} style={{ border: 'none', background: 'none', fontSize: 20, cursor: 'pointer', color: muted }}>✕</button>
+            </div>
+            <div style={{ fontSize: 12, color: muted }}>Copy this and paste into Gmail. Send to the client contact + CC Tanya.</div>
+            <textarea readOnly value={generateEmail()}
+              style={{ flex: 1, minHeight: 380, padding: '12px', borderRadius: 6, border: `1px solid ${rule}`, fontSize: 12, fontFamily: 'monospace', resize: 'vertical', lineHeight: 1.6 }} />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => { navigator.clipboard.writeText(generateEmail()); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+                style={{ padding: '9px 18px', borderRadius: 6, border: 'none', background: ink, color: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
+                {copied ? '✓ Copied!' : 'Copy to clipboard'}
+              </button>
+              <button onClick={() => setShowEmail(false)}
+                style={{ padding: '9px 14px', borderRadius: 6, border: `1px solid ${rule}`, background: 'white', fontSize: 13, cursor: 'pointer' }}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
