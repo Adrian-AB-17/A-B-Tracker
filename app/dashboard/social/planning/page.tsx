@@ -44,6 +44,9 @@ type Slot = {
   assignee: string
   notes: string
   caption_id?: string
+  asset_url?: string
+  asset_type?: string
+  asset_filename?: string
 }
 
 type Caption = { id: string; topic: string; caption_text: string; pillar: string; hashtags: string }
@@ -80,6 +83,8 @@ export default function PlanningBoardPage() {
   const [showExport, setShowExport] = useState(false)
   const [copied, setCopied] = useState(false)
   const [draftingSlot, setDraftingSlot] = useState<string | null>(null)
+  const [uploadingAsset, setUploadingAsset] = useState<string | null>(null)
+  const [videoLinkInput, setVideoLinkInput] = useState<Record<string, string>>({})
   const [showEmail, setShowEmail] = useState(false)
 
   const months3 = [-2, -1, 0].map(offset => {
@@ -131,6 +136,9 @@ export default function PlanningBoardPage() {
       assignee: d.assignee ?? 'Emily',
       notes: d.notes ?? '',
       caption_id: d.caption_id,
+      asset_url: d.asset_url ?? undefined,
+      asset_type: d.asset_type ?? undefined,
+      asset_filename: d.asset_filename ?? undefined,
     }
   }
 
@@ -151,26 +159,71 @@ export default function PlanningBoardPage() {
     setDraftingSlot(key)
     
     // Pull top performing captions for this client+pillar as voice reference
+    const refCaps = captions
+      .filter(c => !slot.pillar || c.pillar === slot.pillar)
+      .slice(0, 3)
+      .map(c => c.caption_text)
+      .join('\n\n---\n\n')
+
     try {
-      const res = await fetch('/api/claude/suggest', {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_name: selectedClient,
-          pillar: slot.pillar,
-          content_type: slot.content_type,
-          topic: slot.topic,
-          month: `${MONTH_LABELS[selectedMonth]} ${selectedYear}`,
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: `Write a social media caption for ${selectedClient}.
+
+Post type: ${slot.content_type}
+Pillar: ${slot.pillar}
+Topic: ${slot.topic || 'general content for this pillar'}
+Month: ${MONTH_LABELS[selectedMonth]} ${selectedYear}
+
+Voice reference (approved past captions):
+${refCaps || 'No past captions yet — use a professional, direct tone. Keep it short and avoid heavy hashtags.'}
+
+Rules:
+- Match the voice of past approved captions
+- Keep it concise (2-4 sentences max)
+- No more than 3-4 hashtags
+- No generic phrases like "Let us know" or "Check out our website"
+- For videos: keep caption very short (1-2 lines)
+- For re-posts: include a brief intro + the link placeholder [LINK]
+
+Return ONLY: caption text, then on a new line "HASHTAGS:" followed by the hashtags.`
+          }]
         })
       })
       const data = await res.json()
-      if (data.caption) {
-        updateSlot(type, idx, { caption_text: data.caption, hashtags: data.hashtags ?? '' })
-      }
+      const text = data.content?.[0]?.text ?? ''
+      const parts = text.split('HASHTAGS:')
+      updateSlot(type, idx, {
+        caption_text: parts[0].trim(),
+        hashtags: parts[1]?.trim() ?? ''
+      })
     } catch(e) {
       console.error('Draft failed', e)
     }
     setDraftingSlot(null)
+  }
+
+  async function uploadAsset(type: string, idx: number, file: File) {
+    const key = `${type}-${idx}`
+    setUploadingAsset(key)
+    try {
+      const ext = file.name.split('.').pop()
+      const path = `${selectedClient}/${selectedYear}-${String(selectedMonth+1).padStart(2,'0')}/${type}-${idx}-${Date.now()}.${ext}`
+      const { data, error } = await supabase.storage.from('social-assets').upload(path, file, { upsert: true })
+      if (error) throw error
+      const { data: { publicUrl } } = supabase.storage.from('social-assets').getPublicUrl(path)
+      const assetType = file.type.startsWith('video') ? 'video' : 'image'
+      updateSlot(type, idx, { asset_url: publicUrl, asset_type: assetType, asset_filename: file.name })
+    } catch(e) {
+      console.error('Upload failed', e)
+    }
+    setUploadingAsset(null)
   }
 
   function generateEmail(): string {
@@ -258,6 +311,9 @@ www.abconsultingg.com
       assignee: slot.assignee || null,
       notes: slot.notes || null,
       caption_id: slot.caption_id || null,
+      asset_url: slot.asset_url || null,
+      asset_type: slot.asset_type || null,
+      asset_filename: slot.asset_filename || null,
     }
     if (slot.id) {
       await supabase.from('social_monthly_mix').update(row).eq('id', slot.id)
@@ -341,6 +397,11 @@ www.abconsultingg.com
               )}
               {linkedCap && !slot.caption_text && (
                 <span style={{ fontSize: 11, color: '#185FA5' }}>📎 {linkedCap.topic || 'Caption linked'}</span>
+              )}
+              {slot.asset_url && (
+                <span style={{ fontSize: 11, color: '#047857', marginLeft: 4 }}>
+                  {slot.asset_type === 'image' ? '🖼' : '🎥'} {slot.asset_type === 'link' ? 'Link' : slot.asset_filename || 'Asset'}
+                </span>
               )}
             </div>
           ) : (
