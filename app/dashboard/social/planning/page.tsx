@@ -79,6 +79,7 @@ export default function PlanningBoardPage() {
   const [saving, setSaving] = useState(false)
   const [showExport, setShowExport] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [draftingSlot, setDraftingSlot] = useState<string | null>(null)
   const [showEmail, setShowEmail] = useState(false)
 
   const months3 = [-2, -1, 0].map(offset => {
@@ -144,6 +145,61 @@ export default function PlanningBoardPage() {
   }
 
   function allSlots() { return [...postSlots, ...videoSlots, ...repostSlots] }
+
+  async function draftCaption(type: string, idx: number, slot: Slot) {
+    const key = `${type}-${idx}`
+    setDraftingSlot(key)
+    
+    // Pull top performing captions for this client+pillar as voice reference
+    const refCaps = captions
+      .filter(c => !slot.pillar || c.pillar === slot.pillar)
+      .slice(0, 3)
+      .map(c => c.caption_text)
+      .join('\n\n---\n\n')
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: `Write a social media caption for ${selectedClient}.
+
+Post type: ${slot.content_type}
+Pillar: ${slot.pillar}
+Topic: ${slot.topic || 'general content for this pillar'}
+Month: ${MONTH_LABELS[selectedMonth]} ${selectedYear}
+
+Voice reference (approved past captions):
+${refCaps || 'No past captions yet — use a professional, direct tone. Keep it short and avoid heavy hashtags.'}
+
+Rules:
+- Match the voice of past approved captions
+- Keep it concise (2-4 sentences max)
+- No more than 3-4 hashtags
+- No generic phrases like "Let us know" or "Check out our website"
+- For videos: keep caption very short (1-2 lines)
+- For re-posts: include a brief intro + the link placeholder [LINK]
+
+Return ONLY: caption text, then on a new line "HASHTAGS:" followed by the hashtags.`
+          }]
+        })
+      })
+      const data = await res.json()
+      const text = data.content?.[0]?.text ?? ''
+      const parts = text.split('HASHTAGS:')
+      updateSlot(type, idx, {
+        caption_text: parts[0].trim(),
+        hashtags: parts[1]?.trim() ?? ''
+      })
+    } catch(e) {
+      console.error('Draft failed', e)
+    }
+    setDraftingSlot(null)
+  }
 
   function generateEmail(): string {
     const monthName = MONTH_LABELS[selectedMonth] + ' ' + selectedYear
@@ -342,14 +398,21 @@ www.abconsultingg.com
               </div>
 
               <div style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                   <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Caption</label>
-                  <select style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: `1px solid ${rule}` }}
-                    value={slot.caption_id ?? ''}
-                    onChange={e => e.target.value ? linkCaption(type, idx, e.target.value) : updateSlot(type, idx, { caption_id: undefined })}>
-                    <option value="">— Link from library —</option>
-                    {captions.map(c => <option key={c.id} value={c.id}>{c.topic || c.caption_text.slice(0, 50)}</option>)}
-                  </select>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={() => draftCaption(type, idx, slot)}
+                      disabled={draftingSlot === `${type}-${idx}`}
+                      style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, border: '1px solid #E7E5E4', background: '#F5F5F4', cursor: 'pointer' }}>
+                      {draftingSlot === `${type}-${idx}` ? '✦ Drafting…' : '✦ Suggest with Claude'}
+                    </button>
+                    <select style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: `1px solid ${rule}` }}
+                      value={slot.caption_id ?? ''}
+                      onChange={e => e.target.value ? linkCaption(type, idx, e.target.value) : updateSlot(type, idx, { caption_id: undefined })}>
+                      <option value="">— Link from library —</option>
+                      {captions.map(c => <option key={c.id} value={c.id}>{c.topic || c.caption_text.slice(0, 50)}</option>)}
+                    </select>
+                  </div>
                 </div>
                 <textarea value={slot.caption_text} onChange={e => updateSlot(type, idx, { caption_text: e.target.value })}
                   placeholder="Caption text (or link from library above)…" rows={3}
