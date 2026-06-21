@@ -727,13 +727,19 @@ export default function ReportsPage() {
             {reportingCount} reporting · {clients.length} active clients
           </p>
         </div>
-        <select
-          value={selectedMonth}
-          onChange={e => setSelectedMonth(e.target.value)}
-          style={{ fontSize: 13, padding: '7px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-elevated)', color: 'var(--brand-navy)', fontWeight: 600, cursor: 'pointer' }}
-        >
-          {MONTHS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <a href="/reports/upload"
+            style={{ fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 8, background: 'var(--brand-navy)', color: 'white', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            ↑ Upload data
+          </a>
+          <select
+            value={selectedMonth}
+            onChange={e => setSelectedMonth(e.target.value)}
+            style={{ fontSize: 13, padding: '7px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--bg-elevated)', color: 'var(--brand-navy)', fontWeight: 600, cursor: 'pointer' }}
+          >
+            {MONTHS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 14, marginBottom: 18, flexWrap: 'wrap' }}>
