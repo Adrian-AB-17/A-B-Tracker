@@ -353,6 +353,10 @@ export default function SocialHubPage() {
             <span style={{ fontSize: 18 }}>📅</span>
             <div><div style={{ fontWeight: 600 }}>Planning Board</div><div style={{ fontSize: 12, color: '#78716C' }}>Monthly 12-post plan per client</div></div>
           </a>
+          <a href="/dashboard/social/brands/Culture%20Construction" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', background: 'white', border: '1px solid #E7E5E4', borderRadius: 8, textDecoration: 'none', color: '#1C1917', fontSize: 14, fontWeight: 500 }}>
+            <span style={{ fontSize: 18 }}>🎯</span>
+            <div><div style={{ fontWeight: 600 }}>Brand Profiles</div><div style={{ fontSize: 12, color: '#78716C' }}>Voice Q&amp;A per client</div></div>
+          </a>
           <a href="/dashboard/social/goals" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', background: 'white', border: '1px solid #E7E5E4', borderRadius: 8, textDecoration: 'none', color: '#1C1917', fontSize: 14, fontWeight: 500 }}>
             <span style={{ fontSize: 18 }}>🎯</span>
             <div><div style={{ fontWeight: 600 }}>Q3 Goals</div><div style={{ fontSize: 12, color: '#78716C' }}>6 targets · Emily's Q3 2026</div></div>
