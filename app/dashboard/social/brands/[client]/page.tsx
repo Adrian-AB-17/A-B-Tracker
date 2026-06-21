@@ -189,7 +189,7 @@ export default function BrandProfilePage() {
         <Section title="Business basics">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <Q q="Industry / niche" field="industry" placeholder="e.g. Residential & Commercial Roofing" />
-            <Q q="Location" field="location" placeholder="e.g. Burr Ridge, IL" />
+            <Q q="Location / Cities served" field="location" placeholder="e.g. Burr Ridge, IL · Hinsdale, IL · Western Springs, IL" rows={2} />
             <Q q="Service area" field="service_area" placeholder="e.g. Will County and surrounding suburbs" />
             <Q q="Founded" field="founded" placeholder="e.g. 2012" />
           </div>

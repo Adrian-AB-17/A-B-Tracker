@@ -107,12 +107,32 @@ export default function PlanningBoardPage() {
       .order('slot', { ascending: true })
 
     if (data && data.length > 0) {
-      const posts = data.filter((d: any) => d.content_type === 'Post')
-      const videos = data.filter((d: any) => d.content_type === 'Video')
-      const reposts = data.filter((d: any) => d.content_type === 'Re-Post')
-      if (posts.length) setPostSlots(posts.map((d: any) => dbToSlot(d)))
-      if (videos.length) setVideoSlots(videos.map((d: any) => dbToSlot(d)))
-      if (reposts.length) setRepostSlots(reposts.map((d: any) => dbToSlot(d)))
+      const savedPosts = data.filter((d: any) => d.content_type === 'Post')
+      const savedVideos = data.filter((d: any) => d.content_type === 'Video')
+      const savedReposts = data.filter((d: any) => d.content_type === 'Re-Post')
+
+      // Merge saved slots with defaults — keep defaults for unsaved slots
+      const defaultPosts = [1,2,3,4,5,6].map(n => DEFAULT_SLOT(n, 'Post'))
+      const defaultVideos = [7,8,9,10].map(n => DEFAULT_SLOT(n, 'Video'))
+      const defaultReposts = [11,12].map(n => DEFAULT_SLOT(n, 'Re-Post'))
+
+      function mergeSlots(defaults: Slot[], saved: any[]): Slot[] {
+        const savedBySlot = Object.fromEntries(saved.map((d: any) => [d.slot, dbToSlot(d)]))
+        const maxSlot = Math.max(...defaults.map(s => s.slot_num), ...saved.map((d: any) => d.slot ?? 0))
+        const result = [...defaults]
+        // Add any extra saved slots beyond defaults
+        saved.forEach((d: any) => {
+          if (!result.find(s => s.slot_num === d.slot)) {
+            result.push(dbToSlot(d))
+          }
+        })
+        // Merge saved data into matching default slots
+        return result.map(s => savedBySlot[s.slot_num] ?? s)
+      }
+
+      setPostSlots(mergeSlots(defaultPosts, savedPosts))
+      setVideoSlots(mergeSlots(defaultVideos, savedVideos))
+      setRepostSlots(mergeSlots(defaultReposts, savedReposts))
     } else {
       setPostSlots([1,2,3,4,5,6].map(n => DEFAULT_SLOT(n, 'Post')))
       setVideoSlots([7,8,9,10].map(n => DEFAULT_SLOT(n, 'Video')))
