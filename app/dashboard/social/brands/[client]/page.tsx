@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -98,21 +98,23 @@ export default function BrandProfilePage() {
     setTimeout(() => setSaved(false), 2000)
   }
 
-  const u = (field: keyof Profile, value: any) => setProfile(p => ({ ...p, [field]: value }))
+  const u = useCallback((field: keyof Profile, value: any) => setProfile(p => ({ ...p, [field]: value })), [])
 
-  function Q({ q, field, placeholder, rows, hint }: {
+  // Q is inlined below to avoid re-mount on state change
+  const Q = ({ q, field, placeholder, rows, hint }: {
     q: string; field: keyof Profile; placeholder?: string; rows?: number; hint?: string
-  }) {
+  }) => {
     const val = (profile[field] as string) ?? ''
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => u(field, e.target.value)
     return (
       <div style={{ marginBottom: 20 }}>
         <label style={{ fontSize: 13, fontWeight: 600, color: ink, display: 'block', marginBottom: hint ? 2 : 6 }}>{q}</label>
         {hint && <p style={{ fontSize: 12, color: muted, margin: '0 0 6px' }}>{hint}</p>}
         {rows ? (
-          <textarea value={val} onChange={e => u(field, e.target.value)} placeholder={placeholder} rows={rows}
+          <textarea value={val} onChange={handleChange} placeholder={placeholder} rows={rows}
             style={{ width: '100%', padding: '9px 12px', borderRadius: 6, border: `1px solid ${rule}`, fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', lineHeight: 1.5 }} />
         ) : (
-          <input value={val} onChange={e => u(field, e.target.value)} placeholder={placeholder}
+          <input value={val} onChange={handleChange} placeholder={placeholder}
             style={{ width: '100%', padding: '9px 12px', borderRadius: 6, border: `1px solid ${rule}`, fontSize: 13, boxSizing: 'border-box' }} />
         )}
       </div>
