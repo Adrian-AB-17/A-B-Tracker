@@ -23,6 +23,16 @@ export default async function ReportPage({
   const month = searchParams.month || currentMonth()
   const supabase = createClient()
 
+  // Auth + role check
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: member } = await supabase
+    .from('team_members')
+    .select('role, active')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+  const isAdmin = member?.active && (member?.role === 'admin' || member?.role === 'owner')
+
   const { data: clientRow } = await supabase
     .from('clients')
     .select('id, name, report_color, report_initials, reports_enabled')
@@ -66,9 +76,12 @@ export default async function ReportPage({
         clientInitials={client.initials}
         clientColor={client.color}
         month={month}
+        isAdmin={!!isAdmin}
       />
     )
   }
+
+  const defaultMarkup = clientId === 'rbs' ? 30 : 0
 
   return (
     <ReportDashboard
@@ -80,6 +93,8 @@ export default async function ReportPage({
       reportData={reportData || []}
       report={report}
       uploads={uploads || []}
+      isAdmin={!!isAdmin}
+      defaultMarkup={defaultMarkup}
     />
   )
 }

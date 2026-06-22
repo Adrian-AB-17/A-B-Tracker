@@ -1,4 +1,5 @@
 'use client'
+import ApprovalTab from '@/components/reports/ApprovalTab'
 import React, { useState, useEffect, useCallback } from 'react'
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -174,132 +175,6 @@ function CompareTable({ rows, headers }: { headers: string[]; rows: (string | Re
 }
 
 
-// ─── Approval Tab ─────────────────────────────────────────────────────────────
-
-const APPROVAL_CHANNELS = [
-  { id: 'google_ads',     label: 'Google Ads',       icon: '🔍' },
-  { id: 'meta_ads',       label: 'Meta Ads',         icon: '📘' },
-  { id: 'social_organic', label: 'Social',           icon: '📣' },
-  { id: 'lsa',            label: 'LSA Leads',        icon: '📋' },
-  { id: 'website',        label: 'Website & SEO',    icon: '🌐' },
-  { id: 'email',          label: 'Email',            icon: '✉️' },
-]
-
-type ApprovalRecord = { approved: boolean; notes: string; approved_by: string | null; approved_at: string | null; markup_pct: number | null }
-
-function ApprovalTab({ clientId, month }: { clientId: string; month: string }) {
-  const [approvals, setApprovals] = useState<Record<string, ApprovalRecord>>({})
-  const [saving, setSaving] = useState<Record<string, boolean>>({})
-  const [editingNotes, setEditingNotes] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetch(`/api/reports/approve?clientId=${clientId}&month=${month}`)
-      .then(r => r.json())
-      .then(d => {
-        setApprovals(d.approvals || {})
-        const notes: Record<string, string> = {}
-        Object.entries(d.approvals || {}).forEach(([ch, a]) => { notes[ch] = (a as ApprovalRecord).notes || '' })
-        setEditingNotes(notes)
-      })
-      .finally(() => setLoading(false))
-  }, [clientId, month])
-
-  const toggle = async (channel: string) => {
-    const current = approvals[channel]
-    const newApproved = !current?.approved
-    setSaving(prev => ({ ...prev, [channel]: true }))
-    await fetch('/api/reports/approve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId, month, channel, approved: newApproved, notes: editingNotes[channel] || '', markup_pct: current?.markup_pct ?? 30 }),
-    })
-    setApprovals(prev => ({ ...prev, [channel]: { ...prev[channel], approved: newApproved, approved_at: newApproved ? new Date().toISOString() : null } }))
-    setSaving(prev => ({ ...prev, [channel]: false }))
-  }
-
-  const saveNotes = async (channel: string) => {
-    setSaving(prev => ({ ...prev, [`notes_${channel}`]: true }))
-    await fetch('/api/reports/approve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId, month, channel, approved: approvals[channel]?.approved || false, notes: editingNotes[channel] || '', markup_pct: approvals[channel]?.markup_pct ?? 30 }),
-    })
-    setSaving(prev => ({ ...prev, [`notes_${channel}`]: false }))
-  }
-
-  const approvedCount = APPROVAL_CHANNELS.filter(c => approvals[c.id]?.approved).length
-
-  if (loading) return <div style={{ padding: '32px 0', color: '#6b7280', fontSize: 14 }}>Loading approvals…</div>
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 4, padding: '12px 16px',
-        background: approvedCount === APPROVAL_CHANNELS.length ? '#f0fdf4' : '#f9fafb',
-        border: '1px solid ' + (approvedCount === APPROVAL_CHANNELS.length ? '#86efac' : '#e5e7eb'),
-        borderRadius: 10,
-      }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#0f1b34' }}>
-          {approvedCount}/{APPROVAL_CHANNELS.length} channels approved
-        </div>
-        {approvedCount > 0 && (
-          <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 600 }}>
-            ✓ {approvedCount} published to client portal
-          </span>
-        )}
-      </div>
-      {APPROVAL_CHANNELS.map(ch => {
-        const appr = approvals[ch.id]
-        const isApproved = appr?.approved || false
-        const isSav = saving[ch.id]
-        return (
-          <div key={ch.id} style={{
-            border: '1px solid ' + (isApproved ? '#86efac' : '#e5e7eb'),
-            borderRadius: 10, padding: '14px 16px',
-            background: isApproved ? '#f0fdf4' : '#ffffff',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 16 }}>{ch.icon}</span>
-              <span style={{ fontWeight: 600, fontSize: 14, color: '#0f1b34', flex: 1 }}>{ch.label}</span>
-              {isApproved && appr?.approved_at && (
-                <span style={{ fontSize: 11, color: '#16a34a' }}>
-                  Approved {new Date(appr.approved_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  {appr.approved_by ? ' by ' + appr.approved_by.split('@')[0] : ''}
-                </span>
-              )}
-              <button onClick={() => toggle(ch.id)} disabled={isSav} style={{
-                fontSize: 12, fontWeight: 600, padding: '6px 14px', borderRadius: 7,
-                border: '1px solid ' + (isApproved ? '#16a34a' : '#d1d5db'),
-                background: isApproved ? '#16a34a' : 'transparent',
-                color: isApproved ? '#fff' : '#6b7280',
-                cursor: isSav ? 'not-allowed' : 'pointer', opacity: isSav ? 0.6 : 1,
-              }}>
-                {isSav ? '…' : isApproved ? '✓ Approved' : 'Approve'}
-              </button>
-            </div>
-            <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <textarea
-                value={editingNotes[ch.id] || ''}
-                onChange={e => setEditingNotes(prev => ({ ...prev, [ch.id]: e.target.value }))}
-                placeholder={'Notes for ' + ch.label + ' — visible to client after approval'}
-                rows={2}
-                style={{ flex: 1, fontSize: 12, padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', resize: 'vertical' }}
-              />
-              <button onClick={() => saveNotes(ch.id)} disabled={saving['notes_' + ch.id]} style={{
-                fontSize: 11, padding: '6px 12px', borderRadius: 6, border: '1px solid #e5e7eb',
-                background: '#f9fafb', color: '#6b7280', cursor: 'pointer', whiteSpace: 'nowrap',
-              }}>
-                {saving['notes_' + ch.id] ? '…' : 'Save notes'}
-              </button>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
 
 function Stub({ icon, title, body }: { icon: string; title: string; body: string }) {
   return (
@@ -1028,6 +903,7 @@ interface Props {
   clientInitials: string
   clientColor: string
   month: string
+  isAdmin?: boolean
 }
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
@@ -1039,12 +915,14 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'website',     label: 'Website & SEO',     icon: '🌐' },
   { id: 'cpl',         label: 'Acquisition Cost',  icon: '💰' },
   { id: 'reputation',  label: 'Reputation',        icon: '⭐' },
-  { id: 'approve',     label: 'Approve',           icon: '✅' },
 ]
 
-export default function CultureDashboard({ clientId, clientName, clientInitials, clientColor, month }: Props) {
+export default function CultureDashboard({ clientId, clientName, clientInitials, clientColor, month,
+  isAdmin = false,
+}: Props) {
   const [mounted, setMounted] = useState(false)
   const [tab, setTab] = useState<TabId>('overview')
+  const TABS_WITH_APPROVE = isAdmin ? [...TABS, { id: 'approve' as TabId, label: 'Approve', icon: '✅' }] : TABS
   const [view, setView] = useState<ViewMode>('lm')
 
   useEffect(() => setMounted(true), [])
@@ -1105,7 +983,7 @@ export default function CultureDashboard({ clientId, clientName, clientInitials,
       {/* Tab nav */}
       <div className="border-b px-6 sticky top-0 z-10" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
         <div className="max-w-7xl mx-auto flex gap-0 overflow-x-auto">
-          {TABS.map(t => (
+          {TABS_WITH_APPROVE.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className="px-4 py-3 text-sm font-medium whitespace-nowrap"
               style={{ color: tab === t.id ? 'var(--text)' : 'var(--text-muted)', borderBottom: `2px solid ${tab === t.id ? clientColor : 'transparent'}`, marginBottom: -1 }}>
@@ -1129,8 +1007,8 @@ export default function CultureDashboard({ clientId, clientName, clientInitials,
             body="Once the Chrome extension backfills Google review data into Supabase, this section will show overall rating, review count trend (LM vs PM, YTD), response rate, and recent reviews." />
         )}
 
-        {tab === 'approve' && (
-          <ApprovalTab clientId={clientId} month={month} />
+        {tab === 'approve' && isAdmin && (
+          <ApprovalTab clientId={clientId} month={month} defaultMarkup={0} />
         )}
       </div>
     </div>

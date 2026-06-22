@@ -1,4 +1,5 @@
 'use client'
+import ApprovalTab from '@/components/reports/ApprovalTab'
 import React, { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
@@ -1062,6 +1063,8 @@ interface Props {
   reportData: ReportData[]
   report: Report
   uploads: Upload[]
+  isAdmin?: boolean
+  defaultMarkup?: number
 }
 
 function monthLabel(m: string) {
@@ -1090,6 +1093,8 @@ type TabId = 'social' | 'meta' | 'google' | 'website' | 'email' | 'overview' | '
 export default function ReportDashboard({
   clientId, clientName, clientInitials, clientColor,
   month, reportData, report, uploads,
+  isAdmin = false,
+  defaultMarkup = 0,
 }: Props) {
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -1334,7 +1339,7 @@ export default function ReportDashboard({
     { id: 'email',    label: 'Email',      icon: '📧' },
     { id: 'gmb',      label: 'GMB',        icon: '📍' },
     { id: 'leads',    label: 'Leads',      icon: '🎯' },
-    { id: 'approve',  label: 'Approve',    icon: '✅' },
+    ...(isAdmin ? [{ id: 'approve' as TabId,  label: 'Approve',    icon: '✅' }] : []),
   ]
 
   if (!mounted) return null
@@ -1749,8 +1754,8 @@ export default function ReportDashboard({
           <JotformLeadsTab clientId={clientId} month={month} />
         )}
 
-        {tab === 'approve' && (
-          <LiveDataTab clientId={clientId} month={month} />
+        {tab === 'approve' && isAdmin && (
+          <ApprovalTab clientId={clientId} month={month} defaultMarkup={defaultMarkup} />
         )}
 
 
