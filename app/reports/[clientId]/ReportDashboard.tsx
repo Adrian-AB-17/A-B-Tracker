@@ -1085,7 +1085,7 @@ function pct(n: number | null | undefined) {
   return `${n.toFixed(2)}%`
 }
 
-type TabId = 'social' | 'meta' | 'google' | 'website' | 'email' | 'overview' | 'live' | 'gmb' | 'leads'
+type TabId = 'social' | 'meta' | 'google' | 'website' | 'email' | 'overview' | 'live' | 'gmb' | 'leads' | 'approve'
 
 export default function ReportDashboard({
   clientId, clientName, clientInitials, clientColor,
@@ -1334,6 +1334,7 @@ export default function ReportDashboard({
     { id: 'email',    label: 'Email',      icon: '📧' },
     { id: 'gmb',      label: 'GMB',        icon: '📍' },
     { id: 'leads',    label: 'Leads',      icon: '🎯' },
+    { id: 'approve',  label: 'Approve',    icon: '✅' },
   ]
 
   if (!mounted) return null
@@ -1743,9 +1744,15 @@ export default function ReportDashboard({
         )}
 
         {/* ── LEADS (Jotform) ─────────────────────────────────────────────── */}
+
         {tab === 'leads' && (
           <JotformLeadsTab clientId={clientId} month={month} />
         )}
+
+        {tab === 'approve' && (
+          <LiveDataTab clientId={clientId} month={month} />
+        )}
+
 
       </div>
     </div>
