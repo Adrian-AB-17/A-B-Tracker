@@ -1755,7 +1755,91 @@ export default function ReportDashboard({
         )}
 
         {tab === 'approve' && isAdmin && (
-          <ApprovalTab clientId={clientId} month={month} defaultMarkup={defaultMarkup} />
+          <div className="space-y-6">
+
+            {/* 3 Wins */}
+            <div className="rounded-xl border-2 p-5"
+              style={{ background: 'var(--bg-elevated)', borderColor: clientColor + '40' }}>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🏆</span>
+                  <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>3 wins this month</span>
+                  <span className="text-xs px-2 py-0.5 rounded" style={{ background: clientColor + '15', color: clientColor }}>Client-facing</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={saveHighlights} disabled={savingHighlights}
+                    className="text-xs px-3 py-1 rounded font-semibold disabled:opacity-40"
+                    style={{ background: 'var(--bg)', border: '0.5px solid var(--border)', color: 'var(--text)' }}>
+                    {savingHighlights ? 'Saving…' : 'Save'}
+                  </button>
+                  <button onClick={generateHighlights} disabled={generatingHighlights || !hasAnyData}
+                    className="text-xs px-3 py-1 rounded font-semibold disabled:opacity-40"
+                    style={{ background: clientColor, color: 'white' }}>
+                    {generatingHighlights ? 'Generating…' : highlights.some(h => h) ? '↺ Regenerate' : '✦ Auto-generate'}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="flex items-start gap-3">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5"
+                      style={{ background: clientColor + '20', color: clientColor }}>{i + 1}</div>
+                    <input type="text" value={highlights[i] || ''}
+                      onChange={e => { const next = [...highlights]; next[i] = e.target.value; setHighlights(next) }}
+                      onBlur={saveHighlights}
+                      placeholder={`Win #${i + 1} — e.g. "Impressions grew 24% to 45,000"`}
+                      className="flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none"
+                      style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Narrative */}
+            <div className="rounded-xl border p-5"
+              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">✦</span>
+                  <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>Monthly Narrative</span>
+                  <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1' }}>AI Generated</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {narrative && !narrativeEditing && (
+                    <button onClick={() => setNarrativeEditing(true)}
+                      className="text-xs px-2 py-1 rounded" style={{ color: 'var(--text-muted)' }}>Edit</button>
+                  )}
+                  {narrativeEditing && (
+                    <button onClick={saveNarrative} disabled={savingNarrative}
+                      className="text-xs px-3 py-1 rounded font-semibold"
+                      style={{ background: clientColor, color: 'white' }}>
+                      {savingNarrative ? 'Saving…' : 'Save'}
+                    </button>
+                  )}
+                  <button onClick={generateNarrative} disabled={generating || !hasAnyData}
+                    className="text-xs px-3 py-1 rounded font-semibold disabled:opacity-40"
+                    style={{ background: '#6366f1', color: 'white' }}>
+                    {generating ? 'Generating…' : narrative ? '↺ Regenerate' : '✦ Generate'}
+                  </button>
+                </div>
+              </div>
+              {narrativeEditing ? (
+                <textarea value={narrative} onChange={e => setNarrative(e.target.value)} rows={6}
+                  className="w-full rounded-lg border px-3 py-2 text-sm resize-none focus:outline-none"
+                  style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)', lineHeight: 1.7 }} />
+              ) : narrative ? (
+                <div className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-muted)' }}>{narrative}</div>
+              ) : (
+                <div className="text-sm italic text-center py-6" style={{ color: 'var(--text-muted)' }}>
+                  {hasAnyData ? 'Click "Generate" to create the AI narrative for this report.' : 'Upload files first, then generate.'}
+                </div>
+              )}
+            </div>
+
+            {/* Channel Approvals */}
+            <ApprovalTab clientId={clientId} month={month} defaultMarkup={defaultMarkup} />
+
+          </div>
         )}
 
 
