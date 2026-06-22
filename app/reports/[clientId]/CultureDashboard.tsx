@@ -277,7 +277,7 @@ function GoogleAdsTab({ clientId, month, view }: { clientId: string; month: stri
           </ResponsiveContainer>
         </div>
 
-        {cur.daily.length > 1 && (
+        {(cur.daily?.length ?? 0) > 1 && (
           <div className="rounded-xl border p-4" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
             <div className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Daily Clicks — {monthLabel(month)}</div>
             <ResponsiveContainer width="100%" height={200}>
@@ -370,7 +370,7 @@ function MetaAdsTab({ clientId, month, view }: { clientId: string; month: string
         <KpiCard label="ROAS" value={cur.roas > 0 ? `${cur.roas}x` : '—'} cur={cur.roas} prev={prevData?.roas} prevLabel={prevLabel} color={NAVY} />
       </div>
 
-      {cur.daily.length > 1 && (
+      {(cur.daily?.length ?? 0) > 1 && (
         <div className="rounded-xl border p-4" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
           <div className="text-sm font-bold mb-3" style={{ color: 'var(--text)' }}>Daily Impressions & Clicks</div>
           <ResponsiveContainer width="100%" height={200}>
