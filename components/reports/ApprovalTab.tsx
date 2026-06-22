@@ -10,6 +10,7 @@ const APPROVAL_CHANNELS = [
   { id: 'email',          label: 'Email',            icon: '✉️' },
   { id: 'gmb',            label: 'GMB / Reputation', icon: '⭐' },
   { id: 'acquisition',    label: 'Acquisition Cost', icon: '💰' },
+  { id: 'calls',          label: 'Calls',            icon: '📞' },
 ]
 
 type ApprovalRecord = {

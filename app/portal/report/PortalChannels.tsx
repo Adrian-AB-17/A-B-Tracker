@@ -246,13 +246,16 @@ function renderAcquisition(d: any) {
   return (
     <div>
       <KpiGrid items={[
-        { label: 'Best CPL', value: money(d.bestCpl?.cpl) },
-        { label: 'Worst CPL', value: money(d.worstCpl?.cpl) },
-        { label: 'Blended CPL', value: money(d.blendedCpl) },
+        { label: 'Ad Spend', value: money(d.billedSpend ?? d.spend) },
+        { label: 'Conversions', value: fmt(d.conversions) },
+        { label: 'Cost / Conv.', value: money(d.costPerConversion) },
+        { label: 'CTR', value: pct(d.ctr) },
+        { label: 'Clicks', value: fmt(d.clicks) },
+        { label: 'Impressions', value: fmt(d.impressions) },
       ]} />
-      {(d.channels || []).length > 0 && (
-        <DataTable title="CPL by Channel" headers={['Channel', 'Conversions', 'Spend', 'CPL']}
-          rows={(d.channels || []).map((c: any) => [c.name, fmt(c.conversions), money(c.spend), money(c.cpl)])} />
+      {(d.campaigns || []).length > 0 && (
+        <DataTable title="CPL by Campaign" headers={['Campaign', 'Spend', 'Conv.', 'CPL']}
+          rows={(d.campaigns || []).map((c: any) => [c.name, money(c.cost), fmt(c.conversions), c.conversions > 0 ? money(c.cost / c.conversions) : '—'])} />
       )}
     </div>
   )
@@ -280,7 +283,7 @@ function ChannelCard({ id, icon, label, note, clientId, month }: {
       social:         `/api/reports/social-portal?clientId=${clientId}&month=${month}`,
       social_organic: `/api/reports/social-portal?clientId=${clientId}&month=${month}`,
       lsa:            `/api/reports/culture-lsa?clientId=${clientId}&month=${month}`,
-      acquisition:    `/api/reports/culture-social?clientId=${clientId}&month=${month}`,
+      acquisition:    `/api/reports/google-ads?clientId=${clientId}&month=${month}`,
     }
     fetch(endpoints[id]).then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
     if (!open || data) return
