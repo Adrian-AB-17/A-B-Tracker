@@ -25,12 +25,22 @@ export default function PortalAccess({
   defaultName?: string | null
   initial: PortalUser | null
 }) {
-  const [pu, setPu] = useState<PortalUser | null>(initial)
+  const [users, setUsers] = useState<PortalUser[]>(initial ? [initial] : [])
   const [busy, setBusy] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [showAdd, setShowAdd] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editEmail, setEditEmail] = useState('')
+
+  // New user form state
   const [email, setEmail] = useState(defaultEmail || '')
   const [name, setName] = useState(defaultName || clientName || '')
   const [pw, setPw] = useState('')
+
+  // Add user form state
+  const [addEmail, setAddEmail] = useState('')
+  const [addName, setAddName] = useState('')
+  const [addPw, setAddPw] = useState('')
 
   async function call(payload: any): Promise<any> {
     setBusy(true)
@@ -56,42 +66,72 @@ export default function PortalAccess({
     if (pw.length < 8) { alert('Temporary password must be at least 8 characters.'); return }
     const data = await call({ action: 'create', clientId, email: email.trim(), name: name.trim(), password: pw })
     if (data?.portalUser) {
-      setPu(data.portalUser)
+      setUsers([data.portalUser])
       setShowCreate(false)
       setPw('')
-      alert(`Portal login created for ${data.portalUser.email}. Share the temporary password with the client securely — they can change it from their Account page after first login.`)
+      alert(`Portal login created for ${data.portalUser.email}. Share the temporary password with the client securely.`)
     }
   }
 
-  async function resetPassword() {
-    if (!pu?.auth_user_id) return
+  async function addUser() {
+    if (!addEmail.trim() || !addName.trim()) { alert('Name and email are required.'); return }
+    if (addPw.length < 8) { alert('Temporary password must be at least 8 characters.'); return }
+    const data = await call({ action: 'add_user', clientId, email: addEmail.trim(), name: addName.trim(), password: addPw })
+    if (data?.portalUser) {
+      setUsers(prev => [...prev, data.portalUser])
+      setShowAdd(false)
+      setAddEmail('')
+      setAddName('')
+      setAddPw('')
+      alert(`Portal login created for ${data.portalUser.email}. Share the temporary password with the client securely.`)
+    }
+  }
+
+  async function saveEmail(u: PortalUser) {
+    if (!editEmail.trim()) { alert('Email cannot be empty.'); return }
+    if (!u.auth_user_id) { alert('No auth user linked.'); return }
+    const data = await call({ action: 'update_email', id: u.id, authUserId: u.auth_user_id, email: editEmail.trim() })
+    if (data?.portalUser) {
+      setUsers(prev => prev.map(p => p.id === u.id ? data.portalUser : p))
+      setEditingId(null)
+    }
+  }
+
+  async function resetPassword(u: PortalUser) {
+    if (!u.auth_user_id) return
     const np = prompt('Enter a new temporary password (min 8 chars). Share it with the client securely.')
     if (np === null) return
     if (np.length < 8) { alert('Password must be at least 8 characters.'); return }
-    const data = await call({ action: 'reset', authUserId: pu.auth_user_id, password: np })
+    const data = await call({ action: 'reset', authUserId: u.auth_user_id, password: np })
     if (data?.ok) alert('Password reset. Share the new temporary password with the client securely.')
   }
 
-  async function revoke() {
-    if (!pu) return
-    if (!confirm(`Revoke portal access for ${pu.email}? They will be unable to log in until restored.`)) return
-    const data = await call({ action: 'revoke', id: pu.id })
-    if (data?.portalUser) setPu(data.portalUser)
+  async function revoke(u: PortalUser) {
+    if (!confirm(`Revoke portal access for ${u.email}? They will be unable to log in until restored.`)) return
+    const data = await call({ action: 'revoke', id: u.id })
+    if (data?.portalUser) setUsers(prev => prev.map(p => p.id === u.id ? data.portalUser : p))
   }
 
-  async function restore() {
-    if (!pu) return
-    const data = await call({ action: 'restore', id: pu.id })
-    if (data?.portalUser) setPu(data.portalUser)
+  async function restore(u: PortalUser) {
+    const data = await call({ action: 'restore', id: u.id })
+    if (data?.portalUser) setUsers(prev => prev.map(p => p.id === u.id ? data.portalUser : p))
   }
+
+  const hasUsers = users.length > 0
 
   return (
     <div className="space-y-3">
-      <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">
-        Portal access
+      <div className="flex items-center justify-between border-b border-gray-100 pb-1">
+        <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Portal access</div>
+        {hasUsers && (
+          <button onClick={() => { setShowAdd(true); setShowCreate(false) }} disabled={busy}
+            className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-50">
+            + Add user
+          </button>
+        )}
       </div>
 
-      {!pu && !showCreate && (
+      {!hasUsers && !showCreate && (
         <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-lg p-3">
           <div className="text-sm text-gray-600">
             No portal login yet. Create one so this client can sign in and see their work orders.
@@ -104,7 +144,7 @@ export default function PortalAccess({
         </div>
       )}
 
-      {!pu && showCreate && (
+      {!hasUsers && showCreate && (
         <div className="bg-gray-50 rounded-lg p-3 space-y-2.5">
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Login name</label>
@@ -140,42 +180,103 @@ export default function PortalAccess({
         </div>
       )}
 
-      {pu && (
-        <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-gray-900 truncate">{pu.email}</div>
-              <div className="text-[11px] text-gray-500">
-                {pu.active
-                  ? (pu.last_login_at ? `Last login ${new Date(pu.last_login_at).toLocaleDateString()}` : 'Never logged in')
+      {/* Existing users list */}
+      {users.map(u => (
+        <div key={u.id} className="bg-gray-50 rounded-lg p-3 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              {editingId === u.id ? (
+                <div className="flex items-center gap-2">
+                  <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)}
+                    className="flex-1 text-sm px-2 py-1 border border-blue-400 rounded focus:outline-none"
+                    onKeyDown={e => { if (e.key === 'Enter') saveEmail(u); if (e.key === 'Escape') setEditingId(null) }}
+                    autoFocus />
+                  <button onClick={() => saveEmail(u)} disabled={busy}
+                    className="text-xs px-2 py-1 rounded bg-blue-600 text-white font-semibold disabled:opacity-50">
+                    {busy ? '…' : 'Save'}
+                  </button>
+                  <button onClick={() => setEditingId(null)} disabled={busy}
+                    className="text-xs px-2 py-1 rounded text-gray-500 hover:bg-gray-100">
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <div className="text-sm font-medium text-gray-900 truncate">{u.email}</div>
+                  <button onClick={() => { setEditingId(u.id); setEditEmail(u.email) }}
+                    className="text-[11px] text-gray-400 hover:text-blue-600 flex-shrink-0" title="Edit email">
+                    ✎
+                  </button>
+                </div>
+              )}
+              <div className="text-[11px] text-gray-500 mt-0.5">
+                {u.name && <span className="mr-2">{u.name}</span>}
+                {u.active
+                  ? (u.last_login_at ? `Last login ${new Date(u.last_login_at).toLocaleDateString()}` : 'Never logged in')
                   : 'Access revoked'}
               </div>
             </div>
             <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded font-mono flex-shrink-0"
-              style={pu.active
+              style={u.active
                 ? { background: '#d1fae5', color: '#065f46' }
                 : { background: '#f3f4f6', color: '#6b7280' }}>
-              {pu.active ? 'Active' : 'Revoked'}
+              {u.active ? 'Active' : 'Revoked'}
             </span>
           </div>
           <div className="flex flex-wrap gap-2 pt-1">
-            {pu.active ? (
+            {u.active ? (
               <>
-                <button onClick={resetPassword} disabled={busy}
+                <button onClick={() => resetPassword(u)} disabled={busy}
                   className="text-xs px-3 py-1.5 rounded-md font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-100 disabled:opacity-50">
                   Reset password
                 </button>
-                <button onClick={revoke} disabled={busy}
+                <button onClick={() => revoke(u)} disabled={busy}
                   className="text-xs px-3 py-1.5 rounded-md font-semibold text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50">
                   Revoke access
                 </button>
               </>
             ) : (
-              <button onClick={restore} disabled={busy}
+              <button onClick={() => restore(u)} disabled={busy}
                 className="text-xs px-3 py-1.5 rounded-md font-semibold text-green-700 bg-green-50 hover:bg-green-100 disabled:opacity-50">
                 Restore access
               </button>
             )}
+          </div>
+        </div>
+      ))}
+
+      {/* Add additional user form */}
+      {showAdd && (
+        <div className="bg-blue-50 rounded-lg p-3 space-y-2.5 border border-blue-100">
+          <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Add another user</div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Name</label>
+            <input type="text" value={addName} onChange={e => setAddName(e.target.value)}
+              placeholder="Contact name"
+              className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Email</label>
+            <input type="email" value={addEmail} onChange={e => setAddEmail(e.target.value)}
+              placeholder="contact@client.com"
+              className="w-full text-sm px-3 py-2 border border-gray-200 rounded focus:border-blue-500 focus:outline-none" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Temporary password</label>
+            <input type="text" value={addPw} onChange={e => setAddPw(e.target.value)}
+              placeholder="min 8 characters"
+              className="w-full text-sm px-3 py-2 border border-gray-200 rounded font-mono focus:border-blue-500 focus:outline-none" />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={addUser} disabled={busy}
+              className="flex-1 py-2.5 rounded-lg font-semibold text-white text-sm disabled:opacity-50"
+              style={{ background: '#1a2b4a' }}>
+              {busy ? 'Creating…' : 'Add user'}
+            </button>
+            <button onClick={() => { setShowAdd(false); setAddEmail(''); setAddName(''); setAddPw('') }} disabled={busy}
+              className="px-4 py-2.5 rounded-lg font-semibold text-gray-600 hover:bg-gray-100 text-sm">
+              Cancel
+            </button>
           </div>
         </div>
       )}
