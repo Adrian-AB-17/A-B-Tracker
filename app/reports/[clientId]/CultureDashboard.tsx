@@ -31,8 +31,8 @@ interface MetaData {
 }
 
 interface SocialData {
-  totalImpressions: number; totalEngagements: number; totalFollowerChange: number; engRate: number
-  platforms: { network: string; label: string; impressions: number; engagements: number; posts: number; followerChange: number; followers: number; engRate: number }[]
+  totalImpressions: number; totalEngagements: number; totalFollowerChange: number; engRate: number; totalVideoViews?: number; totalLinkClicks?: number
+  platforms: { network: string; label: string; impressions: number; engagements: number; posts: number; followerChange: number; followers: number; engRate: number; videoViews?: number; postLinkClicks?: number }[]
   topPosts: { network: string; postType: string; publishedAt: string; impressions: number; engagements: number; reactions: number; videoViews: number; preview: string | null; engRate: number }[]
 }
 
@@ -445,6 +445,8 @@ function SocialTab({ clientId, month, view }: { clientId: string; month: string;
         <KpiCard label="Total Engagements" value={f(cur.totalEngagements)} cur={cur.totalEngagements} prev={prevData?.totalEngagements} prevLabel={prevLabel} color={NAVY} />
         <KpiCard label="Engagement Rate" value={pct(cur.engRate)} cur={cur.engRate} prev={prevData?.engRate} prevLabel={prevLabel} color={NAVY} />
         <KpiCard label="Follower Change" value={cur.totalFollowerChange >= 0 ? `+${cur.totalFollowerChange}` : `${cur.totalFollowerChange}`} cur={cur.totalFollowerChange} prev={prevData?.totalFollowerChange} prevLabel={prevLabel} color={NAVY} />
+        {(cur.totalVideoViews || 0) > 0 && <KpiCard label="Video Views" value={f(cur.totalVideoViews || 0)} cur={cur.totalVideoViews} prev={prevData?.totalVideoViews} prevLabel={prevLabel} color={NAVY} />}
+        {(cur.totalLinkClicks || 0) > 0 && <KpiCard label="Link Clicks" value={f(cur.totalLinkClicks || 0)} cur={cur.totalLinkClicks} prev={prevData?.totalLinkClicks} prevLabel={prevLabel} color={NAVY} />}
       </div>
 
       {/* Platform breakdown */}
@@ -453,7 +455,7 @@ function SocialTab({ clientId, month, view }: { clientId: string; month: string;
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '2px solid var(--border)' }}>
-              {['Platform', 'Impressions', '∆ vs prev', 'Engagements', '∆ vs prev', 'Eng. Rate', 'Posts'].map((h, i) => (
+              {['Platform', 'Impressions', '∆ vs prev', 'Engagements', '∆ vs prev', 'Eng. Rate', 'Video Views', 'Link Clicks', 'Posts'].map((h, i) => (
                 <th key={i} style={{ textAlign: i === 0 ? 'left' : 'right', padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>{h}</th>
               ))}
             </tr>
@@ -479,6 +481,8 @@ function SocialTab({ clientId, month, view }: { clientId: string; month: string;
                   <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace', color: p.engRate > 3 ? '#2d7a3e' : p.engRate > 1 ? 'var(--text-muted)' : '#c25613' }}>
                     {pct(p.engRate)}
                   </td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{p.videoViews ? f(p.videoViews) : '—'}</td>
+                  <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{p.postLinkClicks ? f(p.postLinkClicks) : '—'}</td>
                   <td style={{ padding: '9px 12px', textAlign: 'right', fontFamily: 'monospace' }}>{p.posts || '—'}</td>
                 </tr>
               )

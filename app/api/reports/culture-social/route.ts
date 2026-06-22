@@ -45,6 +45,27 @@ async function fetchSocialForMonth(supabase: Awaited<ReturnType<typeof createCli
     byNetwork[net].followers       = Math.max(byNetwork[net].followers, row.followers || 0)
   }
 
+  // Video views + link clicks from report_data (uploaded from Sprout CSV)
+  const { data: rdMetrics } = await supabase
+    .from('report_data')
+    .select('platform, metric, value')
+    .eq('client_id', 'culture')
+    .eq('month', month)
+    .eq('section', 'social_organic')
+    .in('metric', ['video_views', 'post_link_clicks'])
+
+  const rdNetMap: Record<string, string> = {
+    facebook: 'facebook', instagram: 'fb_instagram_account',
+    linkedin: 'linkedin_company', youtube: 'youtube', tiktok: 'tiktok',
+  }
+  const videoViewsByNet: Record<string, number> = {}
+  const linkClicksByNet: Record<string, number> = {}
+  for (const row of rdMetrics || []) {
+    const netKey = rdNetMap[row.platform] || row.platform
+    if (row.metric === 'video_views') videoViewsByNet[netKey] = (videoViewsByNet[netKey] || 0) + Number(row.value || 0)
+    if (row.metric === 'post_link_clicks') linkClicksByNet[netKey] = (linkClicksByNet[netKey] || 0) + Number(row.value || 0)
+  }
+
   // Top posts for the month
   const { data: posts } = await supabase
     .from('sprout_posts')
@@ -76,14 +97,21 @@ async function fetchSocialForMonth(supabase: Awaited<ReturnType<typeof createCli
       posts: v.posts,
       followerChange: v.followerChange,
       followers: v.followers,
+      videoViews: videoViewsByNet[net] || 0,
+      postLinkClicks: linkClicksByNet[net] || 0,
       engRate: v.impressions > 0 ? parseFloat(((v.engagements / v.impressions) * 100).toFixed(2)) : 0,
     }))
     .sort((a, b) => b.impressions - a.impressions)
+
+  const totalVideoViews = Object.values(videoViewsByNet).reduce((s, v) => s + v, 0)
+  const totalLinkClicks = Object.values(linkClicksByNet).reduce((s, v) => s + v, 0)
 
   return {
     totalImpressions,
     totalEngagements,
     totalFollowerChange,
+    totalVideoViews,
+    totalLinkClicks,
     engRate: parseFloat(engRate.toFixed(2)),
     platforms,
     topPosts: (posts || []).map(p => ({
