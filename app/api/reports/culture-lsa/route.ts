@@ -17,7 +17,7 @@ async function fetchLSAForMonth(supabase: Awaited<ReturnType<typeof createClient
     .from('lsa_leads')
     .select('*')
     .eq('client_id', 'culture')
-    .like('lead_date', `${month}%`)
+    .eq('lead_month', month)
 
   if (leads && leads.length > 0) {
     const total = leads.length
