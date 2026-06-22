@@ -170,12 +170,14 @@ export default async function PortalReportPage({
             clientId={clientId}
             month={month}
             channels={[
-              { id: 'gmb',    icon: '⭐', label: 'Reputation Management' },
-              { id: 'meta',   icon: '📘', label: 'Meta Ads' },
-              { id: 'gads',   icon: '🔵', label: 'Google Ads' },
-              { id: 'ga4',    icon: '📊', label: 'Website Performance' },
-              { id: 'social', icon: '🌱', label: 'Social Media' },
-              { id: 'email',  icon: '✉️',  label: 'Email Marketing' },
+              { id: 'gmb',            icon: '⭐', label: 'Reputation Management' },
+              { id: 'meta_ads',       icon: '📘', label: 'Meta Ads' },
+              { id: 'google_ads',     icon: '🔵', label: 'Google Ads' },
+              { id: 'website',        icon: '📊', label: 'Website Performance' },
+              { id: 'social_organic', icon: '🌱', label: 'Social Media' },
+              { id: 'email',          icon: '✉️',  label: 'Email Marketing' },
+              { id: 'lsa',            icon: '📋', label: 'LSA Leads' },
+              { id: 'acquisition',    icon: '💰', label: 'Acquisition Cost' },
             ]
               .filter(ch => approvedChannels.has(ch.id))
               .map(ch => ({ ...ch, note: approvalNotes[ch.id] || '' }))
