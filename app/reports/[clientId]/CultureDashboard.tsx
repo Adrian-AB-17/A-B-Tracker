@@ -891,6 +891,110 @@ function OverviewTab({ clientId, month, view }: { clientId: string; month: strin
           <div className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>* 2025 LSA CPL estimated. CPL increase driven by storm/hail campaigns; LSA itself is holding steady.</div>
         </div>
       )}
+
+      {/* Action Plan */}
+      <CultureActionPlan clientId={clientId} month={month} />
+
+    </div>
+  )
+}
+
+// ─── Action Plan ──────────────────────────────────────────────────────────────
+
+type ActionItem = { id: string; title: string; description: string; priority: 'high' | 'medium' | 'low'; channel: string; created?: boolean }
+
+function CultureActionPlan({ clientId, month }: { clientId: string; month: string }) {
+  const [items, setItems] = React.useState<ActionItem[]>([])
+  const [generating, setGenerating] = React.useState(false)
+  const [creatingId, setCreatingId] = React.useState<string | null>(null)
+
+  async function generate() {
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/reports/narrative', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName: 'Culture Construction',
+          month,
+          summary: `Client: Culture Construction. Month: ${month}. Exterior remodeling contractor in Chicago area. Services: James Hardie siding, roofing, windows, storm damage restoration. Running Google Ads (LSA + Search), Meta Ads, and organic social.`,
+          question: 'Generate 4-5 specific action items for next month. Return ONLY a JSON array: [{ "title": "short task", "description": "1-2 sentences on what to do and why", "priority": "high|medium|low", "channel": "Google Ads|Meta Ads|Social|Email|Website|LSA|GMB|Strategy" }]. No extra text, just the array.',
+        }),
+      })
+      const data = await res.json()
+      const raw = (data.narrative || '').replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(raw)
+      setItems(parsed.map((item: any, i: number) => ({ ...item, id: `action-${i}-${Date.now()}` })))
+    } catch (e) { console.error('Action plan failed', e) }
+    setGenerating(false)
+  }
+
+  async function createWO(item: ActionItem) {
+    setCreatingId(item.id)
+    try {
+      const res = await fetch('/api/work-orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: `[Culture Construction] ${item.title}`, client_id: clientId, notes: item.description, priority: item.priority }),
+      })
+      if (res.ok) setItems(prev => prev.map(p => p.id === item.id ? { ...p, created: true } : p))
+    } catch (e) { console.error('WO create failed', e) }
+    setCreatingId(null)
+  }
+
+  const pColor: Record<string, string> = { high: '#dc2626', medium: '#d97706', low: '#6b7280' }
+  const pBg: Record<string, string> = { high: '#fef2f2', medium: '#fffbeb', low: '#f9fafb' }
+
+  return (
+    <div className="rounded-xl border p-5" style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-base">📋</span>
+          <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>Action Plan</span>
+          <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1' }}>Internal only</span>
+        </div>
+        <button onClick={generate} disabled={generating}
+          className="text-xs px-3 py-1.5 rounded font-semibold disabled:opacity-40"
+          style={{ background: '#6366f1', color: 'white' }}>
+          {generating ? 'Generating…' : items.length ? '↺ Regenerate' : '✦ Generate action plan'}
+        </button>
+      </div>
+      {items.length === 0 && !generating && (
+        <div className="text-sm italic text-center py-6" style={{ color: 'var(--text-muted)' }}>
+          Generate an AI-powered action plan based on this month&apos;s data.
+        </div>
+      )}
+      {generating && <div className="text-sm text-center py-6" style={{ color: 'var(--text-muted)' }}>Analyzing data and building action plan…</div>}
+      <div className="space-y-3">
+        {items.map(item => (
+          <div key={item.id} className="rounded-lg border p-4" style={{ background: pBg[item.priority] || '#f9fafb', borderColor: '#e5e7eb' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{item.title}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
+                    style={{ background: pBg[item.priority], color: pColor[item.priority], border: `1px solid ${pColor[item.priority]}30` }}>
+                    {item.priority}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                    {item.channel}
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{item.description}</p>
+              </div>
+              <button onClick={() => createWO(item)} disabled={!!item.created || creatingId === item.id}
+                className="text-xs px-3 py-1.5 rounded-lg font-semibold flex-shrink-0 disabled:opacity-50"
+                style={{ background: item.created ? '#f0fdf4' : 'var(--brand-navy, #0f1e3f)', color: item.created ? '#16a34a' : 'white', border: item.created ? '1px solid #86efac' : 'none' }}>
+                {item.created ? '✓ Created' : creatingId === item.id ? '…' : '+ Create WO'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {items.length > 0 && (
+        <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>Internal only — not visible to client. Click &quot;+ Create WO&quot; to add to the board.</p>
+      )}
     </div>
   )
 }
