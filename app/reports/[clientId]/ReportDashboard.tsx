@@ -1577,52 +1577,14 @@ export default function ReportDashboard({
               )}
             </div>
 
-            {/* Claude Analysis */}
-            <div className="rounded-xl border p-5"
-              style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-base">🤖</span>
-                <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>
-                  Ask Claude about this report
-                </span>
-              </div>
-              <div className="flex gap-2 mb-3">
-                <input
-                  type="text"
-                  value={claudeQuery}
-                  onChange={e => setClaudeQuery(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && askClaude()}
-                  placeholder={`e.g. "What's the biggest opportunity for ${clientName} next month?"`}
-                  className="flex-1 rounded-lg border px-3 py-2 text-sm focus:outline-none"
-                  style={{ background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--text)' }}
-                />
-                <button onClick={askClaude} disabled={claudeLoading || !claudeQuery.trim() || !hasData}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-40"
-                  style={{ background: 'var(--brand-navy, #0f1e3f)', color: 'white' }}>
-                  {claudeLoading ? '…' : 'Ask'}
-                </button>
-              </div>
-              {claudeResponse && (
-                <div className="rounded-lg p-4 text-sm leading-relaxed"
-                  style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                  {claudeResponse}
-                </div>
-              )}
-              <div className="flex gap-2 mt-2 flex-wrap">
-                {[
-                  'What should we focus on next month?',
-                  'Where is spend performing vs not?',
-                  'What content is working best?',
-                  'Any red flags in this data?',
-                ].map(q => (
-                  <button key={q} onClick={() => { setClaudeQuery(q); }}
-                    className="text-xs px-2 py-1 rounded-full"
-                    style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Action Plan */}
+            <ActionPlanPanel
+              clientId={clientId}
+              clientName={clientName}
+              month={month}
+              hasData={hasAnyData}
+              summary={buildSummary()}
+            />
 
             {/* Upload status */}
             <div className="rounded-xl border p-5"
@@ -1849,6 +1811,161 @@ export default function ReportDashboard({
 }
 
 // ── Shared components ────────────────────────────────────────────────────────
+
+
+// ── Action Plan Panel ─────────────────────────────────────────────────────────
+
+type ActionItem = {
+  id: string
+  title: string
+  description: string
+  priority: 'high' | 'medium' | 'low'
+  channel: string
+  creating?: boolean
+  created?: boolean
+}
+
+function ActionPlanPanel({ clientId, clientName, month, hasData, summary }: {
+  clientId: string
+  clientName: string
+  month: string
+  hasData: boolean
+  summary: string
+}) {
+  const [items, setItems] = useState<ActionItem[]>([])
+  const [generating, setGenerating] = useState(false)
+  const [creatingId, setCreatingId] = useState<string | null>(null)
+
+  async function generate() {
+    if (!hasData) return
+    setGenerating(true)
+    try {
+      const res = await fetch('/api/reports/narrative', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName, month,
+          summary,
+          question: `Based on this marketing data, generate 4-5 specific action items for next month. Each should be a concrete task the agency should do. Return ONLY a JSON array of objects with these fields: { "title": "short task title", "description": "1-2 sentence explanation of what to do and why", "priority": "high|medium|low", "channel": "Google Ads|Meta Ads|Social|Email|Website|LSA|GMB|Strategy" }. No extra text, just the JSON array.`,
+        }),
+      })
+      const data = await res.json()
+      const raw = data.narrative || ''
+      const clean = raw.replace(/\`\`\`json|\`\`\`/g, '').trim()
+      const parsed = JSON.parse(clean)
+      setItems(parsed.map((item: any, i: number) => ({ ...item, id: `action-${i}-${Date.now()}` })))
+    } catch (e) {
+      console.error('Action plan failed', e)
+    }
+    setGenerating(false)
+  }
+
+  async function createWO(item: ActionItem) {
+    setCreatingId(item.id)
+    try {
+      const res = await fetch('/api/work-orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `[${clientName}] ${item.title}`,
+          client_id: clientId,
+          notes: item.description,
+          priority: item.priority,
+          stage: 'not_started',
+          source: 'action_plan',
+          source_month: month,
+        }),
+      })
+      if (res.ok) {
+        setItems(prev => prev.map(p => p.id === item.id ? { ...p, created: true } : p))
+      }
+    } catch (e) {
+      console.error('WO create failed', e)
+    }
+    setCreatingId(null)
+  }
+
+  const priorityColor: Record<string, string> = {
+    high: '#dc2626', medium: '#d97706', low: '#6b7280',
+  }
+  const priorityBg: Record<string, string> = {
+    high: '#fef2f2', medium: '#fffbeb', low: '#f9fafb',
+  }
+
+  return (
+    <div className="rounded-xl border p-5"
+      style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <span className="text-base">📋</span>
+          <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>Action Plan</span>
+          <span className="text-xs px-2 py-0.5 rounded"
+            style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1' }}>
+            Internal only
+          </span>
+        </div>
+        <button onClick={generate} disabled={generating || !hasData}
+          className="text-xs px-3 py-1.5 rounded font-semibold disabled:opacity-40"
+          style={{ background: '#6366f1', color: 'white' }}>
+          {generating ? 'Generating…' : items.length ? '↺ Regenerate' : '✦ Generate action plan'}
+        </button>
+      </div>
+
+      {items.length === 0 && !generating && (
+        <div className="text-sm italic text-center py-6" style={{ color: 'var(--text-muted)' }}>
+          {hasData ? 'Generate an AI-powered action plan based on this month&apos;s data.' : 'Upload data first to generate an action plan.'}
+        </div>
+      )}
+
+      {generating && (
+        <div className="text-sm text-center py-6" style={{ color: 'var(--text-muted)' }}>
+          Analyzing data and building action plan…
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {items.map(item => (
+          <div key={item.id} className="rounded-lg border p-4"
+            style={{ background: priorityBg[item.priority] || '#f9fafb', borderColor: '#e5e7eb' }}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{item.title}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wide"
+                    style={{ background: priorityBg[item.priority], color: priorityColor[item.priority], border: `1px solid ${priorityColor[item.priority]}30` }}>
+                    {item.priority}
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                    style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                    {item.channel}
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{item.description}</p>
+              </div>
+              <button
+                onClick={() => createWO(item)}
+                disabled={!!item.created || creatingId === item.id}
+                className="text-xs px-3 py-1.5 rounded-lg font-semibold flex-shrink-0 disabled:opacity-50"
+                style={{
+                  background: item.created ? '#f0fdf4' : 'var(--brand-navy, #0f1e3f)',
+                  color: item.created ? '#16a34a' : 'white',
+                  border: item.created ? '1px solid #86efac' : 'none',
+                }}>
+                {item.created ? '✓ Created' : creatingId === item.id ? '…' : '+ Create WO'}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {items.length > 0 && (
+        <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
+          Action items are internal only — not visible to the client. Click "+ Create WO" to add to the work order board.
+        </p>
+      )}
+    </div>
+  )
+}
 
 function delta(current: number | null | undefined, compare: number | null | undefined) {
   if (current == null || compare == null || compare === 0) return null
