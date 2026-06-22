@@ -189,8 +189,8 @@ export default function ClientsClient({
 }) {
   const isAdmin = currentMember?.role === 'admin' || currentMember?.role === 'owner'
   const portalByClient = useMemo(() => {
-    const m: Record<string, PortalUser> = {}
-    portalUsers.forEach(p => { m[p.client_id] = p })
+    const m: Record<string, PortalUser[]> = {}
+    portalUsers.forEach(p => { if (!m[p.client_id]) m[p.client_id] = []; m[p.client_id].push(p) })
     return m
   }, [portalUsers])
   const supabase = createClient()
@@ -943,7 +943,7 @@ export default function ClientsClient({
                   clientName={selected.name}
                   defaultEmail={selected.contact_email}
                   defaultName={selected.contact_name}
-                  initial={portalByClient[selected.id] || null}
+                  initial={portalByClient[selected.id]?.[0] || null}
                 />
               )}
 
