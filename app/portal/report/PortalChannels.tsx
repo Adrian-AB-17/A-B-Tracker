@@ -283,7 +283,8 @@ function ChannelCard({ id, icon, label, note, clientId, month }: {
       acquisition:    `/api/reports/culture-social?clientId=${clientId}&month=${month}`,
     }
     fetch(endpoints[id]).then(r => r.json()).then(d => { setData(d); setLoading(false) }).catch(() => setLoading(false))
-  }, [open, id, clientId, month, data])
+    if (!open || data) return
+  }, [open, id, clientId, month])
 
   const renderData = () => {
     if (loading) return <div style={{ fontSize: 13, color: '#9ca3af', paddingTop: 10 }}>Loading…</div>
