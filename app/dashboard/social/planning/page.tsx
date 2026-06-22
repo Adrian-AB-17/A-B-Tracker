@@ -178,50 +178,22 @@ export default function PlanningBoardPage() {
     const key = `${type}-${idx}`
     setDraftingSlot(key)
     
-    // Pull top performing captions for this client+pillar as voice reference
-    const refCaps = captions
-      .filter(c => !slot.pillar || c.pillar === slot.pillar)
-      .slice(0, 3)
-      .map(c => c.caption_text)
-      .join('\n\n---\n\n')
-
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('/api/claude/suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
-          messages: [{
-            role: 'user',
-            content: `Write a social media caption for ${selectedClient}.
-
-Post type: ${slot.content_type}
-Pillar: ${slot.pillar}
-Topic: ${slot.topic || 'general content for this pillar'}
-Month: ${MONTH_LABELS[selectedMonth]} ${selectedYear}
-
-Voice reference (approved past captions):
-${refCaps || 'No past captions yet — use a professional, direct tone. Keep it short and avoid heavy hashtags.'}
-
-Rules:
-- Match the voice of past approved captions
-- Keep it concise (2-4 sentences max)
-- No more than 3-4 hashtags
-- No generic phrases like "Let us know" or "Check out our website"
-- For videos: keep caption very short (1-2 lines)
-- For re-posts: include a brief intro + the link placeholder [LINK]
-
-Return ONLY: caption text, then on a new line "HASHTAGS:" followed by the hashtags.`
-          }]
+          client_name: selectedClient,
+          pillar: slot.pillar,
+          content_type: slot.content_type,
+          topic: slot.topic,
+          month: `${MONTH_LABELS[selectedMonth]} ${selectedYear}`,
         })
       })
       const data = await res.json()
-      const text = data.content?.[0]?.text ?? ''
-      const parts = text.split('HASHTAGS:')
       updateSlot(type, idx, {
-        caption_text: parts[0].trim(),
-        hashtags: parts[1]?.trim() ?? ''
+        caption_text: data.caption ?? '',
+        hashtags: data.hashtags ?? ''
       })
     } catch(e) {
       console.error('Draft failed', e)
