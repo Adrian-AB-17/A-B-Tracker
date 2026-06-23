@@ -61,7 +61,7 @@ async function fetchPostAnalytics(sproutProfileIds: number[], startDate: string,
       `created_time.in(${startDate}T00:00:00...${endDate}T23:59:59)`,
     ],
     fields: ['guid', 'created_time', 'perma_link', 'text', 'post_type', 'customer_profile_id'],
-    metrics: ['lifetime.impressions', 'lifetime.engagements', 'lifetime.reactions', 'lifetime.video_views', 'lifetime.link_clicks'],
+    metrics: ['lifetime.impressions', 'lifetime.engagements', 'lifetime.reactions', 'lifetime.video_views'],
     timezone: 'America/Chicago',
     page,
     limit: 50,
@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
             reactions: post.metrics?.['lifetime.reactions'] ?? 0,
             comments: 0, shares: 0,
             video_views: post.metrics?.['lifetime.video_views'] ?? 0,
-            clicks: post.metrics?.['lifetime.link_clicks'] ?? 0,
+            clicks: 0,
             tags: [], updated_at: new Date().toISOString(),
           })
         }
