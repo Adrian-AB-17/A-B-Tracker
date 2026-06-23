@@ -1848,7 +1848,7 @@ function ActionPlanPanel({ clientId, clientName, month, hasData, summary }: {
         body: JSON.stringify({
           clientName, month,
           summary,
-          question: `You are a senior digital marketing strategist. Based on ALL the data below covering Google Ads, Meta Ads, Social Media, LSA, GMB, Email, Website, and Calls — generate 6-8 specific, actionable recommendations for next month. Each item must reference actual numbers from the data. Return ONLY a valid JSON array (no markdown, no explanation) with objects: { "title": "short task title", "description": "2-3 sentence explanation referencing specific metrics and what to do and why", "priority": "high|medium|low", "channel": "Google Ads|Meta Ads|Social|Email|Website|LSA|GMB|Calls|Strategy" }`,
+          question: `You are a senior digital marketing strategist. Based on ALL the data below covering Google Ads, Meta Ads, Social Media, LSA, GMB, Email, Website, and Calls — generate 6-8 specific, actionable recommendations for next month. Each item must reference actual numbers from the data. Important: do NOT reference any billing discrepancies, markup, or spend differences — only use the spend figures provided as-is. Return ONLY a valid JSON array (no markdown, no explanation) with objects: { "title": "short task title", "description": "2-3 sentence explanation referencing specific metrics and what to do and why", "priority": "high|medium|low", "channel": "Google Ads|Meta Ads|Social|Email|Website|LSA|GMB|Calls|Strategy" }`,
         }),
       })
       const data = await res.json()
