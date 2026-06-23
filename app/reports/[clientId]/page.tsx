@@ -34,7 +34,7 @@ export default async function ReportPage({
 
   const { data: clientRow } = await supabase
     .from('clients')
-    .select('id, name, report_color, report_initials, reports_enabled')
+    .select('id, name, report_color, report_initials, reports_enabled, industry')
     .eq('id', clientId)
     .maybeSingle()
   if (!clientRow || !clientRow.reports_enabled) redirect('/reports')
@@ -42,6 +42,7 @@ export default async function ReportPage({
     name: clientRow.name,
     initials: clientRow.report_initials || (clientRow.name.split(' ').slice(0,2).map((w: string) => w[0]?.toUpperCase() || '').join('')),
     color: clientRow.report_color || '#6366f1',
+    industry: clientRow.industry || '',
   }
 
   const [
@@ -76,6 +77,7 @@ export default async function ReportPage({
       clientName={client.name}
       clientInitials={client.initials}
       clientColor={client.color}
+      clientIndustry={client.industry}
       month={month}
       reportData={reportData || []}
       report={report}

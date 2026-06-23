@@ -1061,6 +1061,7 @@ interface Props {
   clientName: string
   clientInitials: string
   clientColor: string
+  clientIndustry: string
   month: string
   reportData: ReportData[]
   report: Report
@@ -1093,7 +1094,7 @@ function pct(n: number | null | undefined) {
 type TabId = 'social' | 'meta' | 'google' | 'website' | 'email' | 'overview' | 'live' | 'gmb' | 'leads' | 'approve' | 'calls' | 'acquisition'
 
 export default function ReportDashboard({
-  clientId, clientName, clientInitials, clientColor,
+  clientId, clientName, clientInitials, clientColor, clientIndustry,
   month, reportData, report, uploads,
   isAdmin = false,
   defaultMarkup = 0,
@@ -1172,7 +1173,7 @@ export default function ReportDashboard({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientId, clientName, month: monthLabel(month), summary,
+          clientId, clientName, clientIndustry, month: monthLabel(month), summary,
           question: 'List exactly 3 positive highlights from this month in plain language a client would understand. Each highlight should be one sentence, specific, and start with a number or metric where possible. Return ONLY a JSON array of 3 strings, nothing else. Example: ["Impressions grew 24% to 45,000 this month", "Your Facebook engagement rate outperformed the industry average", "3 new followers gained on LinkedIn"]',
         }),
       })
@@ -1302,7 +1303,7 @@ export default function ReportDashboard({
     const res = await fetch('/api/reports/narrative', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ clientId, clientName, month: monthLabel(month), summary }),
+      body: JSON.stringify({ clientId, clientName, clientIndustry, month: monthLabel(month), summary }),
     })
     if (res.ok) {
       const { narrative: n } = await res.json()
@@ -1469,7 +1470,7 @@ export default function ReportDashboard({
                   <KpiCard label="New Followers" value={fmt(metrics.gained)}       sub="this month"                  color={clientColor} />
                   <KpiCard label="Meta Spend"    value={money(metaSpend)}          sub={`${pct(metaCtr)} CTR · ${fmt(metaClicks)} clicks`} color={clientColor} />
                   {gadsSpend != null
-                    ? <KpiCard label="G Ads Spend" value={money(gadsBilled ?? gadsSpend)} sub={`${pct(gadsCtr)} CTR · ${fmt(gadsClicks)} clicks`} color={clientColor} />
+                    ? <KpiCard label="G Ads Spend" value={money(gadsSpend)} sub={`${pct(gadsCtr)} CTR · ${fmt(gadsClicks)} clicks`} color={clientColor} />
                     : <KpiCard label="Meta CPC"    value={money(metaCpc)}           sub={`${fmt(metaClicks)} clicks`} color={clientColor} />
                   }
                 </div>
@@ -1587,6 +1588,7 @@ export default function ReportDashboard({
               clientName={clientName}
               month={month}
               hasData={hasAnyData}
+              clientIndustry={clientIndustry}
               summary={buildSummary()}
             />
 
@@ -1827,9 +1829,10 @@ type ActionItem = {
   created?: boolean
 }
 
-function ActionPlanPanel({ clientId, clientName, month, hasData, summary }: {
+function ActionPlanPanel({ clientId, clientName, clientIndustry, month, hasData, summary }: {
   clientId: string
   clientName: string
+  clientIndustry: string
   month: string
   hasData: boolean
   summary: string
@@ -1846,9 +1849,9 @@ function ActionPlanPanel({ clientId, clientName, month, hasData, summary }: {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientName, month,
+          clientName, clientIndustry, month,
           summary,
-          question: `You are a senior digital marketing strategist. Based on ALL the data below covering Google Ads, Meta Ads, Social Media, LSA, GMB, Email, Website, and Calls — generate 6-8 specific, actionable recommendations for next month. Each item must reference actual numbers from the data. Important: do NOT reference any billing discrepancies, markup, or spend differences — only use the spend figures provided as-is. Return ONLY a valid JSON array (no markdown, no explanation) with objects: { "title": "short task title", "description": "2-3 sentence explanation referencing specific metrics and what to do and why", "priority": "high|medium|low", "channel": "Google Ads|Meta Ads|Social|Email|Website|LSA|GMB|Calls|Strategy" }`,
+          question: `You are a senior digital marketing strategist. The client operates in the ${clientIndustry} industry. Based on ALL the data below covering Google Ads, Meta Ads, Social Media, LSA, GMB, Email, Website, and Calls — generate 6-8 specific, actionable recommendations for next month. Each item must reference actual numbers from the data. Important: do NOT reference any billing discrepancies, markup, or spend differences — only use the spend figures provided as-is. Return ONLY a valid JSON array (no markdown, no explanation) with objects: { "title": "short task title", "description": "2-3 sentence explanation referencing specific metrics and what to do and why", "priority": "high|medium|low", "channel": "Google Ads|Meta Ads|Social|Email|Website|LSA|GMB|Calls|Strategy" }`,
         }),
       })
       const data = await res.json()
