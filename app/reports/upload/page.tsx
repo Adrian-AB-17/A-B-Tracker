@@ -27,7 +27,7 @@ function matchesClient(profile: string, clientId: string): boolean {
     case 'culture':
       return p.includes('culture construction') || p === '@cultureccc' || p === 'culture_construction_' || p === 'cultureccc'
     case 'kbc':
-      return p.includes('k.b.c') || p.includes('kennedy brother') || p.includes('kennedy brothers') || p === 'kbconstr' || p.includes('k.b.c restoration') || p === 'kbc exteriors'
+      return p.includes('k.b.c') || p.includes('kennedy brother') || p.includes('kennedy brothers') || p === 'kbconstr' || p.includes('k.b.c restoration') || p.includes('kbc exteriors')
     case 'apollo-events':
       return p.includes('apollo supply') || p === 'apollo_supplyco'
     case 'mvp-chiro':
