@@ -102,6 +102,21 @@ export default function ReportsUploadPage() {
   const [clearing, setClearing] = useState<string | null>(null)
   const [narrativeStatus, setNarrativeStatus] = useState<Record<string, 'idle'|'generating'|'done'|'error'>>({})
   const refs = useRef<Record<string, HTMLInputElement | null>>({})
+  const [topPosts, setTopPosts] = useState<Record<string, any[]>>({})
+
+  async function loadTopPosts(clientId: string, month: string) {
+    const from = month + '-01'
+    const to = month + '-31'
+    const { data } = await supabase
+      .from('sprout_posts')
+      .select('network, post_type, published_at, text_content, impressions, engagements, reactions, video_views, permalink')
+      .ilike('client_name', '%' + clientId.replace(/-/g, ' ') + '%')
+      .gte('published_at', from + 'T00:00:00Z')
+      .lte('published_at', to + 'T23:59:59Z')
+      .order('engagements', { ascending: false })
+      .limit(3)
+    if (data?.length) setTopPosts(prev => ({ ...prev, [clientId]: data }))
+  }
 
   useEffect(() => { loadUploads() }, [month])
 
@@ -388,6 +403,9 @@ export default function ReportsUploadPage() {
     setParseResults(prev => ({ ...prev, [fileType]: results }))
     await loadUploads()
     setUploading(null)
+    if (fileType === 'profile_performance') {
+      for (const r of results) { await loadTopPosts(r.clientId, month) }
+    }
   }
 
   async function clearClientMonth(clientId: string) {
@@ -520,16 +538,45 @@ export default function ReportsUploadPage() {
                 {results.length > 0 && (
                   <div className="mt-3 space-y-1">
                     {results.map(r => (
-                      <div key={r.clientId} className="flex items-center justify-between px-3 py-2 rounded-lg text-xs"
-                        style={{ background: 'var(--bg)', border: '0.5px solid var(--border)' }}>
-                        <span className="font-medium" style={{ color: 'var(--text)' }}>{r.clientName}</span>
-                        <span style={{ color: 'var(--text-muted)' }}>
-                          {r.rows} rows
-                          {Object.keys(r.metrics).slice(0, 3).map(k => {
-                            const parts = k.split('__'); const [platform, metric] = parts.length > 1 ? parts : [k, null]
-                            return metric ? ` · ${platform} ${metric}: ${Math.round(r.metrics[k]).toLocaleString()}` : ` · ${Math.round(r.metrics[k]).toLocaleString()} ${platform}`
-                          }).join('')}
-                        </span>
+                      <div key={r.clientId}>
+                        <div className="flex items-center justify-between px-3 py-2 rounded-lg text-xs"
+                          style={{ background: 'var(--bg)', border: '0.5px solid var(--border)' }}>
+                          <span className="font-medium" style={{ color: 'var(--text)' }}>{r.clientName}</span>
+                          <span style={{ color: 'var(--text-muted)' }}>
+                            {r.rows} rows
+                            {Object.keys(r.metrics).slice(0, 3).map(k => {
+                              const parts = k.split('__'); const [platform, metric] = parts.length > 1 ? parts : [k, null]
+                              return metric ? ` · ${platform} ${metric}: ${Math.round(r.metrics[k]).toLocaleString()}` : ` · ${Math.round(r.metrics[k]).toLocaleString()} ${platform}`
+                            }).join('')}
+                          </span>
+                        </div>
+                        {topPosts[r.clientId]?.length > 0 && (
+                          <div className="mt-2">
+                            <div className="text-xs font-semibold uppercase tracking-wide mb-2 px-1" style={{ color: 'var(--text-muted)' }}>Top 3 Posts</div>
+                            <div className="grid grid-cols-3 gap-2">
+                              {topPosts[r.clientId].slice(0, 3).map((p, i) => {
+                                const netIcon: Record<string,string> = { facebook: '📘', fb_instagram_account: '📸', instagram: '📸', linkedin_company: '💼', youtube: '▶️', tiktok: '🎵' }
+                                return (
+                                  <div key={i} className="rounded-lg p-3 text-xs" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                                    <div className="flex items-center gap-1 mb-1">
+                                      <span>{netIcon[p.network] || '📱'}</span>
+                                      <span className="uppercase font-semibold" style={{ color: 'var(--text-muted)', fontSize: 10 }}>{p.post_type || 'Post'}</span>
+                                      <span style={{ color: 'var(--text-muted)', fontSize: 10, marginLeft: 'auto' }}>{p.published_at?.slice(0,10)}</span>
+                                    </div>
+                                    <div className="line-clamp-3 mb-2" style={{ color: 'var(--text)', lineHeight: 1.4 }}>
+                                      {p.text_content?.slice(0, 80) || '—'}{p.text_content?.length > 80 ? '…' : ''}
+                                    </div>
+                                    <div className="flex gap-2" style={{ color: 'var(--text-muted)' }}>
+                                      <span>❤️ {p.engagements?.toLocaleString() || 0}</span>
+                                      {p.video_views > 0 && <span>▶️ {p.video_views?.toLocaleString()}</span>}
+                                      <span style={{ marginLeft: 'auto' }}>👁 {p.impressions?.toLocaleString() || 0}</span>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
