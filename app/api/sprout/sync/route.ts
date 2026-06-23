@@ -191,6 +191,78 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── Aggregate sprout_profiles into report_data for all clients ────────────
+    const CLIENT_ID_MAP: Record<string, string> = {
+      'Richards Building Supply':     'rbs',
+      'Culture Construction':          'culture',
+      'KBC Exteriors':                 'kbc',
+      'K.B. Construction':             'kbc',
+      'MVP Chiropractic':              'mvp-chiro',
+      'Midwest Construction Experts':  'midwest-constrcution-experts',
+      'Apollo Supply':                 'apollo-events',
+      'Midway Windows':                'midway-windows-doors',
+      'Affiliated Control Equipment':  'affiliated-control',
+      'NICO Roofing':                  'nico-roofing',
+      'A&B Consulting Group':          'a-b-consulting-group',
+      'APEK Inc.':                     'apek',
+      'RG General Roofing':            'rg-general-roofing',
+      'Franos Roofing':                'franos-roofing',
+    }
+    const NET_MAP: Record<string, string> = {
+      facebook: 'facebook', fb_instagram_account: 'instagram',
+      instagram: 'instagram', linkedin_company: 'linkedin',
+      linkedin: 'linkedin', youtube: 'youtube',
+      tiktok: 'tiktok', x: 'x', twitter: 'x',
+    }
+
+    // Get unique months in the sync range
+    const months: Set<string> = new Set()
+    const dCur = new Date(startStr)
+    const dEnd = new Date(endStr)
+    while (dCur <= dEnd) {
+      months.add(`${dCur.getFullYear()}-${String(dCur.getMonth() + 1).padStart(2, '0')}`)
+      dCur.setMonth(dCur.getMonth() + 1)
+    }
+
+    for (const month of months) {
+      const from = `${month}-01`
+      const to   = `${month}-31`
+      const { data: aggRows } = await supabase
+        .from('sprout_profiles')
+        .select('client_name, network, impressions, engagements, posts_sent, net_follower_change')
+        .gte('reported_date', from)
+        .lte('reported_date', to)
+
+      if (!aggRows?.length) continue
+
+      const agg: Record<string, Record<string, Record<string, number>>> = {}
+      for (const row of aggRows) {
+        const clientId = CLIENT_ID_MAP[row.client_name]
+        if (!clientId) continue
+        const platform = NET_MAP[row.network] || row.network
+        if (!agg[clientId]) agg[clientId] = {}
+        if (!agg[clientId][platform]) agg[clientId][platform] = { impressions: 0, engagements: 0, posts: 0, audience_gained: 0 }
+        agg[clientId][platform].impressions     += row.impressions || 0
+        agg[clientId][platform].engagements     += row.engagements || 0
+        agg[clientId][platform].posts           += row.posts_sent || 0
+        agg[clientId][platform].audience_gained += row.net_follower_change || 0
+      }
+
+      const upserts: any[] = []
+      for (const [clientId, platforms] of Object.entries(agg)) {
+        for (const [platform, metrics] of Object.entries(platforms)) {
+          for (const [metric, value] of Object.entries(metrics)) {
+            if (!value) continue
+            upserts.push({ client_id: clientId, month, section: 'social_organic', platform, metric, value, source: 'sprout_api' })
+          }
+        }
+      }
+      if (upserts.length > 0) {
+        await supabase.from('report_data').upsert(upserts, { onConflict: 'client_id,month,section,platform,metric' })
+      }
+    }
+    // ── End aggregation ────────────────────────────────────────────────────────
+
     await supabase.from('sprout_sync_log').insert({ profiles_upserted: profilesUpserted, posts_upserted: postsUpserted, date_range_start: startStr, date_range_end: endStr, status: 'success' })
     return NextResponse.json({ success: true, profiles_upserted: profilesUpserted, posts_upserted: postsUpserted, date_range: { start: startStr, end: endStr } })
 
