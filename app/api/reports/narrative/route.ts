@@ -26,12 +26,12 @@ Month: ${month}
 Data:
 ${summary}
 
-Write 3 short paragraphs (2-3 sentences each):
-1. The strongest positive result this month with a specific number
-2. The biggest concern or gap with a specific number and why it matters
-3. One clear recommendation the client should act on next month
+Write 3 short paragraphs (2-3 sentences each) for a business owner who is not a marketing expert. Explain what happened this month and why it is great for their business in plain everyday language.
+1. The biggest win this month — explain what the number means in real terms (e.g. "732 people searched and clicked to call" not "impressions increased")
+2. How the different marketing efforts worked together to bring in more customers or grow the brand — explain it like talking to a friend
+3. What this momentum means for the business going forward — encouraging and forward-looking
 
-Rules: plain language, lead with the most important fact, be specific, no headers or bullets, no "This month" or "Overall" openers, sound like a strategic advisor. All currency values are in USD — always use $ symbol, never £ or € or any other currency symbol.`,
+Rules: no marketing jargon, write like texting a smart friend who owns a business, purely positive and celebratory, connect every number to a real business outcome, no headers or bullets, no "This month" or "Overall" openers, no concerns or problems, no recommendations or action items. All currency values are in USD — always use $ symbol.`,
       }],
     }),
   })
