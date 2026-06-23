@@ -362,8 +362,28 @@ export default function ReportsUploadPage() {
             .eq('client_id', clientId).eq('month', month).eq('business_name', r.business_name).eq('address', r.address)
         }
         await supabase.from('gmb_location_data').insert(rows)
+
+        // Aggregate totals into report_data
+        const totals = rows.reduce((acc: any, r: any) => {
+          acc.search_mobile  += r.search_mobile  || 0
+          acc.search_desktop += r.search_desktop || 0
+          acc.maps_mobile    += r.maps_mobile    || 0
+          acc.maps_desktop   += r.maps_desktop   || 0
+          acc.calls          += r.calls          || 0
+          acc.directions     += r.directions     || 0
+          acc.website_clicks += r.website_clicks || 0
+          return acc
+        }, { search_mobile: 0, search_desktop: 0, maps_mobile: 0, maps_desktop: 0, calls: 0, directions: 0, website_clicks: 0 })
+
+        const rdUpserts = Object.entries(totals)
+          .filter(([, v]) => (v as number) > 0)
+          .map(([metric, value]) => ({ client_id: clientId, month, section: 'gmb', platform: 'all', metric, value, source: 'gmb_csv' }))
+        if (rdUpserts.length > 0) {
+          await supabase.from('report_data').upsert(rdUpserts, { onConflict: 'client_id,month,section,platform,metric' })
+        }
+
         const client = CLIENTS.find(c => c.id === clientId)!
-        results.push({ clientId, clientName: client?.name || clientId, rows: rows.length, metrics: { locations: rows.length } })
+        results.push({ clientId, clientName: client?.name || clientId, rows: rows.length, metrics: { locations: rows.length, calls: totals.calls, directions: totals.directions } })
       }
       if (locationRows.length === 0) {
         results.push({ clientId: 'none', clientName: 'No matched clients — check business names', rows: 0, metrics: {} })
