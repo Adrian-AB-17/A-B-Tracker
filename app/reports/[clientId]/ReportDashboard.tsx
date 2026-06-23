@@ -1123,7 +1123,7 @@ export default function ReportDashboard({
 
   // Build enriched summary including Windsor live data
   function buildSummary() {
-    const base = reportData.map(r => `${r.section} / ${r.platform} / ${r.metric}: ${r.value}`).join('\n')
+    const base = reportData.filter(r => r.metric !== 'billed_spend' && r.metric !== 'markup_pct').map(r => `${r.section} / ${r.platform} / ${r.metric}: ${r.value}`).join('\n')
     if (!liveAds) return base
     const adLines = [
       liveAds.metaSpend    != null ? `meta_ads / meta / spend: ${liveAds.metaSpend}` : '',
@@ -1131,7 +1131,7 @@ export default function ReportDashboard({
       liveAds.metaCtr      != null ? `meta_ads / meta / ctr: ${liveAds.metaCtr}` : '',
       liveAds.metaCpc      != null ? `meta_ads / meta / cpc: ${liveAds.metaCpc}` : '',
       liveAds.gadsSpend    != null ? `google_ads / google / spend: ${liveAds.gadsSpend}` : '',
-      liveAds.gadsBilled   != null ? `google_ads / google / billed_spend: ${liveAds.gadsBilled}` : '',
+      // billed_spend excluded from summary (internal markup only)
       liveAds.gadsClicks   != null ? `google_ads / google / clicks: ${liveAds.gadsClicks}` : '',
       liveAds.gadsCtr      != null ? `google_ads / google / ctr: ${liveAds.gadsCtr}` : '',
       liveAds.gadsConversions != null ? `google_ads / google / conversions: ${liveAds.gadsConversions}` : '',
