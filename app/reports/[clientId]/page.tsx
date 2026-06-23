@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import ReportDashboard from './ReportDashboard'
-import CultureDashboard from './CultureDashboard'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,18 +67,6 @@ export default async function ReportPage({
       .eq('month', month),
   ])
 
-  if (clientId === 'culture') {
-    return (
-      <CultureDashboard
-        clientId={clientId}
-        clientName={client.name}
-        clientInitials={client.initials}
-        clientColor={client.color}
-        month={month}
-        isAdmin={!!isAdmin}
-      />
-    )
-  }
 
   const defaultMarkup = clientId === 'rbs' ? 30 : 0
 
