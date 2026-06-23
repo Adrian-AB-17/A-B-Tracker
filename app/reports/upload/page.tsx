@@ -3,36 +3,51 @@ import { useState, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 const CLIENTS = [
-  { id: 'a-b-consulting-group',  name: 'A&B Consulting Group' },
-  { id: 'nico-roofing',          name: 'Nico Roofing & Exteriors' },
-  { id: 'culture',               name: 'Culture Construction' },
-  { id: 'kbc-exteriors',         name: 'KBC Exteriors LLC' },
-  { id: 'mvp-chiro',             name: 'MVP Chiropractic' },
-  { id: 'midwest-construction',  name: 'Midwest Construction Experts' },
-  { id: 'rbs',                   name: 'Richards Building Supply' },
-  { id: 'apollo-events',         name: 'Apollo Supply' },
+  { id: 'a-b-consulting-group',          name: 'A&B Consulting Group' },
+  { id: 'nico-roofing',                  name: 'Nico Roofing & Exteriors' },
+  { id: 'culture',                       name: 'Culture Construction' },
+  { id: 'kbc',                           name: 'KBC Exteriors' },
+  { id: 'mvp-chiro',                     name: 'MVP Chiropractic' },
+  { id: 'midwest-constrcution-experts',  name: 'Midwest Construction Experts' },
+  { id: 'rbs',                           name: 'Richards Building Supply' },
+  { id: 'apollo-events',                 name: 'Apollo Supply' },
+  { id: 'affiliated-control',            name: 'Affiliated Control Equipment' },
+  { id: 'midway-windows-doors',          name: 'Midway Windows & Doors' },
+  { id: 'apek',                          name: 'APEK Inc.' },
+  { id: 'franos-roofing',                name: 'Franos Roofing' },
+  { id: 'rg-general-roofing',            name: 'RG General Roofing' },
 ]
 
 // Derived from actual Sprout Social profile names in the CSV
 function matchesClient(profile: string, clientId: string): boolean {
-  const p = profile.replace(/^'+/, '').toLowerCase()
+  const p = profile.replace(/^'+/, '').toLowerCase().trim()
   switch (clientId) {
     case 'rbs':
-      return p.startsWith('richards building') || p === '@richardssupply' || p === 'richards building'
+      return p.startsWith('richards building') || p === '@richardssupply' || p === 'richards building' || p === 'richardsbuildingsupply'
     case 'culture':
-      return p.includes('culture construction') || p === '@cultureccc' || p === 'culture_construction_'
-    case 'kbc-exteriors':
-      return p.includes('k.b.c') || p.includes('kennedy brother') || p.includes('kennedy brothers') || p === 'kbconstr'
+      return p.includes('culture construction') || p === '@cultureccc' || p === 'culture_construction_' || p === 'cultureccc'
+    case 'kbc':
+      return p.includes('k.b.c') || p.includes('kennedy brother') || p.includes('kennedy brothers') || p === 'kbconstr' || p.includes('k.b.c restoration') || p === 'kbc exteriors'
     case 'apollo-events':
-      return p.includes('apollo supply')
+      return p.includes('apollo supply') || p === 'apollo_supplyco'
     case 'mvp-chiro':
-      return p.includes('mvp chiro') || p === '@mvpchiro' || p === 'mvpchiro'
-    case 'midwest-construction':
-      return p.includes('midwest construction experts') || p === 'midwest_construction_exp'
+      return p.includes('mvp chiro') || p === '@mvpchiro' || p === 'mvpchiro' || p.includes('mvp chiropractic')
+    case 'midwest-constrcution-experts':
+      return p.includes('midwest construction') || p === 'midwest_construction_exp'
     case 'nico-roofing':
-      return p === 'nico roofing' || p === '@nicoroofing'
+      return p === 'nico roofing' || p === '@nicoroofing' || p.includes('nico exterior') || p.includes('nico roofing')
     case 'a-b-consulting-group':
-      return p === 'a&b consulting group' || p === 'ab_consulting_group' || p.includes('a&b consulting')
+      return p === 'a&b consulting group' || p === 'ab_consulting_group' || p.includes('a&b consulting') || p === '@abconsultingg' || p === 'abconsultingg'
+    case 'affiliated-control':
+      return p.includes('affiliated control')
+    case 'midway-windows-doors':
+      return p.includes('midway windows')
+    case 'apek':
+      return p.includes('apek') || p === 'apekincorporated'
+    case 'franos-roofing':
+      return p.includes('franos roofing') || p === 'franos'
+    case 'rg-general-roofing':
+      return p.includes('rg general roofing') || p.includes('rg general')
     default:
       return false
   }
