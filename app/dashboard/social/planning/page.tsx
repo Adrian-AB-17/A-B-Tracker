@@ -65,6 +65,211 @@ const DEFAULT_SLOT = (num: number, type: 'Post' | 'Video' | 'Re-Post'): Slot => 
   notes: '',
 })
 
+
+// ── SlotCard — defined outside main component to prevent focus loss on re-render ──
+type SlotCardProps = {
+  slot: Slot; type: string; idx: number;
+  editingId: string | null;
+  setEditingId: (id: string | null) => void;
+  updateSlot: (type: string, idx: number, patch: Partial<Slot>) => void;
+  removeSlot: (type: string, idx: number) => void;
+  saveSlot: (slot: Slot) => void;
+  linkCaption: (type: string, idx: number, captionId: string) => void;
+  draftCaption: (type: string, idx: number, slot: Slot) => void;
+  draftingSlot: string | null;
+  captions: Caption[];
+  saving: boolean;
+  stageMap: Record<string, { key: string; label: string; owner: string; color: string; bg: string }>;
+}
+
+function SlotCard({ slot, type, idx, editingId, setEditingId, updateSlot, removeSlot, saveSlot, linkCaption, draftCaption, draftingSlot, captions, saving, stageMap }: SlotCardProps) {
+  const editKey = `${type}-${idx}`
+  const isEditing = editingId === editKey
+  const stage = stageMap[slot.stage] ?? STAGES[0]
+  const linkedCap = captions.find(c => c.id === slot.caption_id)
+  const ink = '#1C1917', muted = '#78716C', rule = '#E7E5E4'
+
+  return (
+    <div style={{ background: 'white', border: `1px solid ${rule}`, borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
+      <div style={{ height: 3, background: stage.color, opacity: 0.6 }} />
+      <div style={{ padding: '12px 14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontFamily: 'monospace', fontSize: 11, color: muted }}>{String(slot.slot_num).padStart(2,'0')}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 99, background: stage.bg, color: stage.color }}>
+              {slot.stage}
+            </span>
+            <span style={{ fontSize: 11, color: muted }}>{stage.owner}</span>
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={() => setEditingId(isEditing ? null : editKey)}
+              style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, border: `1px solid ${rule}`, background: 'white', cursor: 'pointer', color: muted }}>
+              {isEditing ? 'Close' : 'Edit'}
+            </button>
+            <button onClick={() => removeSlot(type, idx)}
+              style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: `1px solid ${rule}`, background: 'white', cursor: 'pointer', color: '#b91c1c' }}>
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {!isEditing ? (
+          <div onClick={() => setEditingId(editKey)} style={{ cursor: 'pointer' }}>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 99, background: '#F5F5F4', color: muted }}>{slot.pillar}</span>
+              {slot.scheduled_date && <span style={{ fontSize: 10, color: muted }}>{new Date(slot.scheduled_date).toLocaleDateString()}</span>}
+            </div>
+            <p style={{ fontSize: 13, margin: '0 0 4px', color: slot.topic ? ink : muted, lineHeight: 1.4 }}>
+              {slot.topic || 'Click to add topic…'}
+            </p>
+            {slot.caption_text && (
+              <p style={{ fontSize: 12, margin: 0, color: muted, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any }}>
+                {slot.caption_text}
+              </p>
+            )}
+            {linkedCap && !slot.caption_text && (
+              <span style={{ fontSize: 11, color: '#185FA5' }}>📎 {linkedCap.topic || 'Caption linked'}</span>
+            )}
+            {slot.asset_url && (
+              <span style={{ fontSize: 11, color: '#047857', marginLeft: 4 }}>
+                {slot.asset_type === 'image' ? '🖼' : '🎥'} {slot.asset_type === 'link' ? 'Link' : slot.asset_filename || 'Asset'}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+              <div>
+                <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Pillar</label>
+                <select value={slot.pillar} onChange={e => updateSlot(type, idx, { pillar: e.target.value })}
+                  style={{ width: '100%', marginTop: 3, padding: '5px 7px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12 }}>
+                  {PILLARS.map(p => <option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Stage</label>
+                <select value={slot.stage} onChange={e => updateSlot(type, idx, { stage: e.target.value })}
+                  style={{ width: '100%', marginTop: 3, padding: '5px 7px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12 }}>
+                  {STAGES.map(s => <option key={s.key}>{s.key}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Topic</label>
+              <input value={slot.topic} onChange={e => updateSlot(type, idx, { topic: e.target.value })}
+                placeholder="What is this post about?"
+                style={{ width: '100%', marginTop: 3, padding: '6px 8px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 13, boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Caption</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => draftCaption(type, idx, slot)}
+                    disabled={draftingSlot === `${type}-${idx}`}
+                    style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, border: '1px solid #E7E5E4', background: '#F5F5F4', cursor: 'pointer' }}>
+                    {draftingSlot === `${type}-${idx}` ? '✦ Drafting…' : '✦ Suggest with Claude'}
+                  </button>
+                  <select style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: `1px solid ${rule}` }}
+                    value={slot.caption_id ?? ''}
+                    onChange={e => e.target.value ? linkCaption(type, idx, e.target.value) : updateSlot(type, idx, { caption_id: undefined })}>
+                    <option value="">— Link from library —</option>
+                    {captions.map(c => <option key={c.id} value={c.id}>{c.topic || c.caption_text.slice(0, 50)}</option>)}
+                  </select>
+                </div>
+              </div>
+              <textarea value={slot.caption_text} onChange={e => updateSlot(type, idx, { caption_text: e.target.value })}
+                placeholder="Caption text (or link from library above)…" rows={3}
+                style={{ width: '100%', marginTop: 4, padding: '6px 8px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12, resize: 'vertical', boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Hashtags</label>
+              <input value={slot.hashtags} onChange={e => updateSlot(type, idx, { hashtags: e.target.value })}
+                placeholder="#tag1 #tag2"
+                style={{ width: '100%', marginTop: 3, padding: '6px 8px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12, boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ marginBottom: 8 }}>
+              <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Design brief (for Majo/Luciana)</label>
+              <textarea value={slot.design_brief} onChange={e => updateSlot(type, idx, { design_brief: e.target.value })}
+                placeholder="Image or video direction…" rows={2}
+                style={{ width: '100%', marginTop: 3, padding: '6px 8px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12, resize: 'vertical', boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+              <div>
+                <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Scheduled date</label>
+                <input type="date" value={slot.scheduled_date} onChange={e => updateSlot(type, idx, { scheduled_date: e.target.value })}
+                  style={{ width: '100%', marginTop: 3, padding: '5px 7px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12 }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Assignee</label>
+                <select value={slot.assignee} onChange={e => updateSlot(type, idx, { assignee: e.target.value })}
+                  style={{ width: '100%', marginTop: 3, padding: '5px 7px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12 }}>
+                  {['Emily', 'Majo', 'Luciana', 'Tanya', 'Adrian'].map(n => <option key={n}>{n}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => saveSlot(slot)} disabled={saving}
+                style={{ padding: '6px 14px', borderRadius: 5, border: 'none', background: ink, color: 'white', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={() => setEditingId(null)}
+                style={{ padding: '6px 12px', borderRadius: 5, border: `1px solid ${rule}`, background: 'white', fontSize: 12, cursor: 'pointer' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+type ColumnProps = {
+  title: string; emoji: string; slots: Slot[]; type: 'Post' | 'Video' | 'Re-Post';
+  addSlot: (type: 'Post' | 'Video' | 'Re-Post') => void;
+  editingId: string | null;
+  setEditingId: (id: string | null) => void;
+  updateSlot: (type: string, idx: number, patch: Partial<Slot>) => void;
+  removeSlot: (type: string, idx: number) => void;
+  saveSlot: (slot: Slot) => void;
+  linkCaption: (type: string, idx: number, captionId: string) => void;
+  draftCaption: (type: string, idx: number, slot: Slot) => void;
+  draftingSlot: string | null;
+  captions: Caption[];
+  saving: boolean;
+  stageMap: Record<string, { key: string; label: string; owner: string; color: string; bg: string }>;
+}
+
+function Column({ title, emoji, slots, type, addSlot, editingId, setEditingId, updateSlot, removeSlot, saveSlot, linkCaption, draftCaption, draftingSlot, captions, saving, stageMap }: ColumnProps) {
+  const muted = '#78716C', rule = '#E7E5E4'
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, color: muted }}>
+          {emoji} {slots.length} {title}
+        </div>
+        <button onClick={() => addSlot(type)}
+          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, border: `1px solid ${rule}`, background: 'white', cursor: 'pointer', color: muted }}>
+          + Add
+        </button>
+      </div>
+      {slots.map((s, i) => (
+        <SlotCard key={`${type}-${i}`} slot={s} type={type} idx={i}
+          editingId={editingId} setEditingId={setEditingId}
+          updateSlot={updateSlot} removeSlot={removeSlot} saveSlot={saveSlot}
+          linkCaption={linkCaption} draftCaption={draftCaption}
+          draftingSlot={draftingSlot} captions={captions} saving={saving} stageMap={stageMap} />
+      ))}
+    </div>
+  )
+}
+
 export default function PlanningBoardPage() {
   const now = new Date()
   const currentMonth = (now.getMonth() + 1) % 12
@@ -341,172 +546,6 @@ www.abconsultingg.com
 
   const ink = '#1C1917', muted = '#78716C', rule = '#E7E5E4'
 
-  function SlotCard({ slot, type, idx }: { slot: Slot; type: string; idx: number }) {
-    const editKey = `${type}-${idx}`
-    const isEditing = editingId === editKey
-    const stage = stageMap[slot.stage] ?? STAGES[0]
-    const linkedCap = captions.find(c => c.id === slot.caption_id)
-
-    return (
-      <div style={{ background: 'white', border: `1px solid ${rule}`, borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
-        {/* Stage indicator bar */}
-        <div style={{ height: 3, background: stage.color, opacity: 0.6 }} />
-
-        <div style={{ padding: '12px 14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontFamily: 'monospace', fontSize: 11, color: muted }}>{String(slot.slot_num).padStart(2,'0')}</span>
-              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 99, background: stage.bg, color: stage.color }}>
-                {slot.stage}
-              </span>
-              <span style={{ fontSize: 11, color: muted }}>{stage.owner}</span>
-            </div>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => setEditingId(isEditing ? null : editKey)}
-                style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, border: `1px solid ${rule}`, background: 'white', cursor: 'pointer', color: muted }}>
-                {isEditing ? 'Close' : 'Edit'}
-              </button>
-              <button onClick={() => removeSlot(type, idx)}
-                style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: `1px solid ${rule}`, background: 'white', cursor: 'pointer', color: '#b91c1c' }}>
-                ✕
-              </button>
-            </div>
-          </div>
-
-          {!isEditing ? (
-            <div onClick={() => setEditingId(editKey)} style={{ cursor: 'pointer' }}>
-              <div style={{ display: 'flex', gap: 4, marginBottom: 6, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 99, background: '#F5F5F4', color: muted }}>{slot.pillar}</span>
-                {slot.scheduled_date && <span style={{ fontSize: 10, color: muted }}>{new Date(slot.scheduled_date).toLocaleDateString()}</span>}
-              </div>
-              <p style={{ fontSize: 13, margin: '0 0 4px', color: slot.topic ? ink : muted, lineHeight: 1.4 }}>
-                {slot.topic || 'Click to add topic…'}
-              </p>
-              {slot.caption_text && (
-                <p style={{ fontSize: 12, margin: 0, color: muted, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as any }}>
-                  {slot.caption_text}
-                </p>
-              )}
-              {linkedCap && !slot.caption_text && (
-                <span style={{ fontSize: 11, color: '#185FA5' }}>📎 {linkedCap.topic || 'Caption linked'}</span>
-              )}
-              {slot.asset_url && (
-                <span style={{ fontSize: 11, color: '#047857', marginLeft: 4 }}>
-                  {slot.asset_type === 'image' ? '🖼' : '🎥'} {slot.asset_type === 'link' ? 'Link' : slot.asset_filename || 'Asset'}
-                </span>
-              )}
-            </div>
-          ) : (
-            <div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                <div>
-                  <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Pillar</label>
-                  <select value={slot.pillar} onChange={e => updateSlot(type, idx, { pillar: e.target.value })}
-                    style={{ width: '100%', marginTop: 3, padding: '5px 7px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12 }}>
-                    {PILLARS.map(p => <option key={p}>{p}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Stage</label>
-                  <select value={slot.stage} onChange={e => updateSlot(type, idx, { stage: e.target.value })}
-                    style={{ width: '100%', marginTop: 3, padding: '5px 7px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12 }}>
-                    {STAGES.map(s => <option key={s.key}>{s.key}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Topic</label>
-                <input value={slot.topic} onChange={e => updateSlot(type, idx, { topic: e.target.value })}
-                  placeholder="What is this post about?"
-                  style={{ width: '100%', marginTop: 3, padding: '6px 8px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 13, boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Caption</label>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button onClick={() => draftCaption(type, idx, slot)}
-                      disabled={draftingSlot === `${type}-${idx}`}
-                      style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, border: '1px solid #E7E5E4', background: '#F5F5F4', cursor: 'pointer' }}>
-                      {draftingSlot === `${type}-${idx}` ? '✦ Drafting…' : '✦ Suggest with Claude'}
-                    </button>
-                    <select style={{ fontSize: 11, padding: '2px 6px', borderRadius: 4, border: `1px solid ${rule}` }}
-                      value={slot.caption_id ?? ''}
-                      onChange={e => e.target.value ? linkCaption(type, idx, e.target.value) : updateSlot(type, idx, { caption_id: undefined })}>
-                      <option value="">— Link from library —</option>
-                      {captions.map(c => <option key={c.id} value={c.id}>{c.topic || c.caption_text.slice(0, 50)}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <textarea value={slot.caption_text} onChange={e => updateSlot(type, idx, { caption_text: e.target.value })}
-                  placeholder="Caption text (or link from library above)…" rows={3}
-                  style={{ width: '100%', marginTop: 4, padding: '6px 8px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12, resize: 'vertical', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Hashtags</label>
-                <input value={slot.hashtags} onChange={e => updateSlot(type, idx, { hashtags: e.target.value })}
-                  placeholder="#tag1 #tag2"
-                  style={{ width: '100%', marginTop: 3, padding: '6px 8px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12, boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Design brief (for Majo/Luciana)</label>
-                <textarea value={slot.design_brief} onChange={e => updateSlot(type, idx, { design_brief: e.target.value })}
-                  placeholder="Image or video direction…" rows={2}
-                  style={{ width: '100%', marginTop: 3, padding: '6px 8px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12, resize: 'vertical', boxSizing: 'border-box' }} />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                <div>
-                  <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Scheduled date</label>
-                  <input type="date" value={slot.scheduled_date} onChange={e => updateSlot(type, idx, { scheduled_date: e.target.value })}
-                    style={{ width: '100%', marginTop: 3, padding: '5px 7px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12 }} />
-                </div>
-                <div>
-                  <label style={{ fontSize: 10, color: muted, fontWeight: 600, textTransform: 'uppercase' }}>Assignee</label>
-                  <select value={slot.assignee} onChange={e => updateSlot(type, idx, { assignee: e.target.value })}
-                    style={{ width: '100%', marginTop: 3, padding: '5px 7px', borderRadius: 5, border: `1px solid ${rule}`, fontSize: 12 }}>
-                    {['Emily', 'Majo', 'Luciana', 'Tanya', 'Adrian'].map(n => <option key={n}>{n}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => saveSlot(slot)} disabled={saving}
-                  style={{ padding: '6px 14px', borderRadius: 5, border: 'none', background: ink, color: 'white', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
-                  {saving ? 'Saving…' : 'Save'}
-                </button>
-                <button onClick={() => setEditingId(null)}
-                  style={{ padding: '6px 12px', borderRadius: 5, border: `1px solid ${rule}`, background: 'white', fontSize: 12, cursor: 'pointer' }}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  function Column({ title, emoji, slots, type }: { title: string; emoji: string; slots: Slot[]; type: 'Post' | 'Video' | 'Re-Post' }) {
-    return (
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, color: muted }}>
-            {emoji} {slots.length} {title}
-          </div>
-          <button onClick={() => addSlot(type)}
-            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 5, border: `1px solid ${rule}`, background: 'white', cursor: 'pointer', color: muted }}>
-            + Add
-          </button>
-        </div>
-        {slots.map((s, i) => <SlotCard key={`${type}-${i}`} slot={s} type={type} idx={i} />)}
-      </div>
-    )
-  }
-
 
 
   return (
@@ -603,9 +642,9 @@ www.abconsultingg.com
           <div style={{ padding: 32, textAlign: 'center', color: muted }}>Loading…</div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20 }}>
-            <Column title="Posts" emoji="📸" slots={postSlots} type="Post" />
-            <Column title="Videos" emoji="🎥" slots={videoSlots} type="Video" />
-            <Column title="Re-Posts" emoji="🔗" slots={repostSlots} type="Re-Post" />
+            <Column title="Posts" emoji="📸" slots={postSlots} type="Post" addSlot={addSlot} editingId={editingId} setEditingId={setEditingId} updateSlot={updateSlot} removeSlot={removeSlot} saveSlot={saveSlot} linkCaption={linkCaption} draftCaption={draftCaption} draftingSlot={draftingSlot} captions={captions} saving={saving} stageMap={stageMap} />
+            <Column title="Videos" emoji="🎥" slots={videoSlots} type="Video" addSlot={addSlot} editingId={editingId} setEditingId={setEditingId} updateSlot={updateSlot} removeSlot={removeSlot} saveSlot={saveSlot} linkCaption={linkCaption} draftCaption={draftCaption} draftingSlot={draftingSlot} captions={captions} saving={saving} stageMap={stageMap} />
+            <Column title="Re-Posts" emoji="🔗" slots={repostSlots} type="Re-Post" addSlot={addSlot} editingId={editingId} setEditingId={setEditingId} updateSlot={updateSlot} removeSlot={removeSlot} saveSlot={saveSlot} linkCaption={linkCaption} draftCaption={draftCaption} draftingSlot={draftingSlot} captions={captions} saving={saving} stageMap={stageMap} />
           </div>
         )}
       </main>
