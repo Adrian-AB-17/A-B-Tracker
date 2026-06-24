@@ -81,7 +81,7 @@ function MiniSparkbar({ values, color }: { values: number[], color: string }) {
 export default function SocialHubPage() {
   const now = new Date()
   const [selectedMonth, setSelectedMonth] = useState((now.getMonth() + 1) % 12)
-  const [selectedYear] = useState(now.getFullYear())
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear())
   const [clients, setClients] = useState<ClientStat[]>([])
   const [agg, setAgg] = useState<AggregateStat | null>(null)
   const [networks, setNetworks] = useState<NetworkStat[]>([])
@@ -252,10 +252,13 @@ export default function SocialHubPage() {
     setSyncing(false)
   }
 
-  const currentMonth = (now.getMonth() + 1) % 12
+  const currentMonth = now.getMonth()
+  const currentYear = now.getFullYear()
+  const [windowOffset, setWindowOffset] = useState(0)
   const months3 = [-2, -1, 0].map(offset => {
-    const m = (currentMonth + offset + 12) % 12
-    return { label: MONTH_LABELS[m], value: m }
+    const totalOffset = offset + windowOffset
+    const d = new Date(currentYear, currentMonth + totalOffset, 1)
+    return { label: MONTH_LABELS[d.getMonth()], value: d.getMonth(), year: d.getFullYear() }
   })
 
   return (
@@ -302,20 +305,26 @@ export default function SocialHubPage() {
               {clients.length} clients · {loading ? '…' : agg?.total_posts ?? 0} posts published this month
             </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 4, borderRadius: 8, background: '#F5F5F4' }}>
-            {months3.map(m => (
-              <button
-                key={m.value}
-                onClick={() => setSelectedMonth(m.value)}
-                style={{
-                  padding: '6px 12px', fontSize: 13, fontWeight: 500, borderRadius: 6, border: 'none', cursor: 'pointer',
-                  background: m.value === selectedMonth ? '#1C1917' : 'transparent',
-                  color: m.value === selectedMonth ? '#FAFAF9' : '#1C1917',
-                }}
-              >
-                {m.label}
-              </button>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => setWindowOffset(o => o - 1)}
+              style={{ padding: '6px 10px', fontSize: 14, borderRadius: 6, border: '1px solid #E7E5E4', background: 'white', cursor: 'pointer', color: '#1C1917' }}>‹</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: 4, borderRadius: 8, background: '#F5F5F4' }}>
+              {months3.map(m => (
+                <button
+                  key={m.value + '-' + m.year}
+                  onClick={() => { setSelectedMonth(m.value); setSelectedYear(m.year) }}
+                  style={{
+                    padding: '6px 12px', fontSize: 13, fontWeight: 500, borderRadius: 6, border: 'none', cursor: 'pointer',
+                    background: m.value === selectedMonth && m.year === selectedYear ? '#1C1917' : 'transparent',
+                    color: m.value === selectedMonth && m.year === selectedYear ? '#FAFAF9' : '#1C1917',
+                  }}
+                >
+                  {m.label} {m.year !== currentYear ? String(m.year).slice(2) : ''}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setWindowOffset(o => o + 1)}
+              style={{ padding: '6px 10px', fontSize: 14, borderRadius: 6, border: '1px solid #E7E5E4', background: 'white', cursor: 'pointer', color: '#1C1917' }}>›</button>
           </div>
         </div>
 
