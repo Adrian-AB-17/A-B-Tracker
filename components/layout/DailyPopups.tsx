@@ -30,6 +30,7 @@ export default function DailyPopups() {
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [savedMsg, setSavedMsg] = useState(false)
 
   const fetchAndShow = useCallback(async (type: 'morning' | 'eod', isManual = false) => {
     const today = new Date().toISOString().slice(0, 10)
@@ -72,8 +73,26 @@ export default function DailyPopups() {
       } catch {}
       setSaving(false)
     }
+    // Also post to standup wall so it shows in the feed
+    if (note.trim()) {
+      try {
+        const supabase2 = createClient()
+        const { data: { user: u } } = await supabase2.auth.getUser()
+        if (u) {
+          await supabase2.from('wall_posts').insert({
+            channel: popup.type === 'morning' ? 'standup' : 'checkout',
+            parent_id: null,
+            author_id: u.id,
+            body: note.trim(),
+            mentions: [],
+            work_order_id: null,
+          })
+        }
+      } catch {}
+    }
     localStorage.setItem(getKey(popup.type, popup.date), '1')
-    setPopup(null)
+    setSavedMsg(true)
+    setTimeout(() => { setPopup(null); setSavedMsg(false) }, 800)
   }, [popup, note])
 
   useEffect(() => {
@@ -165,7 +184,7 @@ export default function DailyPopups() {
           disabled={saving}
           style={{ marginTop: 12, width: '100%', padding: '12px 0', background: 'var(--brand-navy, #1a2744)', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 600, fontSize: 14, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}
         >
-          {saving ? 'Saving...' : note.trim() ? 'Submit & Got it 👍' : 'Got it 👍'}
+          {saving ? 'Saving…' : savedMsg ? '✓ Posted to Standup!' : note.trim() ? 'Submit & Got it 👍' : 'Got it 👍'}
         </button>
       </div>
     </div>

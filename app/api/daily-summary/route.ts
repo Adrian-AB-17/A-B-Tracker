@@ -52,8 +52,8 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       type: 'morning', date: today, member: member.name,
-      overdueApproved: overdueApproved.map((w: any) => ({ id: w.id, title: w.title, client: w.clients?.name, due: w.due_date, owner: w.team_members?.name, stage: w.stage })),
-      dueToday: dueToday.map((w: any) => ({ id: w.id, title: w.title, client: w.clients?.name, due: w.due_date, owner: w.team_members?.name, stage: w.stage })),
+      overdueApproved: overdueApproved.map((w: any) => ({ id: w.id, title: w.title, client: w.clients?.name, due: w.due_date, owner: w.team_members?.name || 'Unassigned', stage: w.stage })),
+      dueToday: dueToday.map((w: any) => ({ id: w.id, title: w.title, client: w.clients?.name, due: w.due_date, owner: w.team_members?.name || 'Unassigned', stage: w.stage })),
       tasksDue: (tasks || []).map((t: any) => ({ id: t.id, title: t.title, due: t.due_date, woTitle: (t.work_orders as any)?.title, client: (t.work_orders as any)?.clients?.name })),
     })
   }
