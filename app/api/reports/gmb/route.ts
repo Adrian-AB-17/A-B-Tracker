@@ -521,6 +521,27 @@ export async function GET(req: NextRequest) {
         return acc
       }, {})
 
+      // Deduplicate by address — sum metrics for rows with same address
+      const addrMap: Record<string, any> = {}
+      for (const l of locations) {
+        const key = (l.address || l.business_name || '').trim().toLowerCase()
+        if (!addrMap[key]) {
+          addrMap[key] = { ...l,
+            search_mobile: 0, search_desktop: 0,
+            maps_mobile: 0, maps_desktop: 0,
+            calls: 0, directions: 0, website_clicks: 0,
+          }
+        }
+        addrMap[key].search_mobile  += l.search_mobile  || 0
+        addrMap[key].search_desktop += l.search_desktop || 0
+        addrMap[key].maps_mobile    += l.maps_mobile    || 0
+        addrMap[key].maps_desktop   += l.maps_desktop   || 0
+        addrMap[key].calls          += l.calls          || 0
+        addrMap[key].directions     += l.directions     || 0
+        addrMap[key].website_clicks += l.website_clicks || 0
+      }
+      const dedupedLocations = Object.values(addrMap)
+
       return NextResponse.json({
         configured: true, clientId, month,
         data: {
@@ -530,7 +551,7 @@ export async function GET(req: NextRequest) {
           calls:            totals.calls,
           directions:       totals.directions,
           websiteClicks:    totals.website_clicks,
-          locations:        locations.map((l: any) => {
+          locations:        dedupedLocations.map((l: any) => {
             // Extract city from address e.g. "4150 E 81st Ave, Merrillville, IN 46410" -> "Merrillville, IN"
             const addrParts = (l.address || '').split(',')
             const city = addrParts.length >= 3
