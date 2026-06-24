@@ -602,7 +602,7 @@ function OverviewTab({
       </Card>
 
       <Card title="🔗 Links">
-        <Row label="Deliverables" value={isAdmin ? (
+        <Row label="Final Deliverables (client-facing)" value={isAdmin ? (
           <span className="inline-flex items-center gap-2">
             <input type="url" defaultValue={woState.deliverables_link || ''} placeholder="https://…"
               onBlur={e => saveField('deliverables_link', e.target.value.trim())}
@@ -615,7 +615,7 @@ function OverviewTab({
         ) : (woState.deliverables_link ? (
           <a href={woState.deliverables_link} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent, #6366f1)' }}>Open ↗</a>
         ) : '—')} />
-        <Row label="Notes link" value={isAdmin ? (
+        <Row label="Dropbox Paper Link" value={isAdmin ? (
           <span className="inline-flex items-center gap-2">
             <input type="url" defaultValue={woState.notes_link || ''} placeholder="https://…"
               onBlur={e => saveField('notes_link', e.target.value.trim())}
