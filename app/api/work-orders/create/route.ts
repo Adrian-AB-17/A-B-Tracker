@@ -18,10 +18,21 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { title, client_id, notes, priority = 'medium' } = body
+  const { title, client_id, notes, priority = 'medium', owner_name, assignee_name, due_date } = body
 
   if (!title || !client_id) {
     return NextResponse.json({ error: 'title and client_id required' }, { status: 400 })
+  }
+
+  // Resolve owner — use named owner if provided, else fall back to current user
+  let ownerId = member.id
+  if (owner_name) {
+    const { data: ownerMember } = await supabase
+      .from('team_members')
+      .select('id')
+      .ilike('name', owner_name)
+      .maybeSingle()
+    if (ownerMember) ownerId = ownerMember.id
   }
 
   const { data, error } = await supabase
@@ -29,16 +40,30 @@ export async function POST(req: NextRequest) {
     .insert({
       title,
       client_id,
-      owner_id: member.id,
+      owner_id: ownerId,
       stage: 'not-started',
       priority,
       occurrence: 'One-time',
       notes: notes || '',
+      due_date: due_date || null,
       submitted_at: new Date().toISOString(),
     })
     .select('id, title')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  // Add assignee if provided
+  if (assignee_name && data) {
+    const { data: assigneeMember } = await supabase
+      .from('team_members')
+      .select('id')
+      .ilike('name', assignee_name)
+      .maybeSingle()
+    if (assigneeMember) {
+      await supabase.from('wo_assignees').insert({ work_order_id: data.id, team_member_id: assigneeMember.id })
+    }
+  }
+
   return NextResponse.json({ ok: true, wo: data })
 }
