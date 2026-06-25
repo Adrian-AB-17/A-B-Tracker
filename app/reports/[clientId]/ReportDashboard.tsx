@@ -885,7 +885,7 @@ function LiveDataTab({ clientId, month }: { clientId: string; month: string }) {
       }),
     });
 
-    if (res.ok) {
+    const resData = await res.json(); console.log('WO create response:', resData); if (res.ok) {
       setApprovals(prev => ({
         ...prev,
         [channel]: {
@@ -1324,7 +1324,7 @@ export default function ReportDashboard({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientId, clientName, clientIndustry, month: monthLabel(month), summary }),
     })
-    if (res.ok) {
+    const resData = await res.json(); console.log('WO create response:', resData); if (res.ok) {
       const { narrative: n } = await res.json()
       setNarrative(n)
       await supabase.from('client_reports').upsert({
@@ -1344,7 +1344,7 @@ export default function ReportDashboard({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clientName, month: monthLabel(month), summary, question: claudeQuery }),
     })
-    if (res.ok) {
+    const resData = await res.json(); console.log('WO create response:', resData); if (res.ok) {
       const { answer } = await res.json()
       setClaudeResponse(answer)
     }
@@ -1916,7 +1916,7 @@ function ActionPlanPanel({ clientId, clientName, clientIndustry, month, hasData,
           due_date: woDue || undefined,
         }),
       })
-      if (res.ok) {
+      const resData = await res.json(); console.log('WO create response:', resData); if (res.ok) {
         setItems(prev => prev.map(p => p.id === woModal.id ? { ...p, created: true } : p))
         setWoModal(null)
       }
