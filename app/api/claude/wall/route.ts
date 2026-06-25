@@ -7,7 +7,7 @@ const supabaseAdmin = createAdmin(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export const PANCHO_AUTHOR_ID = 'a0000000-0000-0000-0000-000000000001'
+const PANCHO_AUTHOR_ID = 'a0000000-0000-0000-0000-000000000001'
 
 export async function POST(req: NextRequest) {
   const supabase = createClient()
