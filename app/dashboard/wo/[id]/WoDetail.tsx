@@ -91,8 +91,8 @@ function BackToBoardLink() {
 }
 
 
-function AssigneesEditor({ woId, initialAssignees, team, isAdmin }: {
-  woId: string; initialAssignees: { id: string; name: string }[]
+function AssigneesEditor({ woId, woTitle, initialAssignees, team, isAdmin }: {
+  woId: string; woTitle: string; initialAssignees: { id: string; name: string }[]
   team: { id: string; name: string; auth_user_id: string | null }[]; isAdmin: boolean
 }) {
   const supabase = createClient()
@@ -102,7 +102,22 @@ function AssigneesEditor({ woId, initialAssignees, team, isAdmin }: {
   async function add(memberId: string) {
     const m = team.find(t => t.id === memberId); if (!m) return
     const { error } = await supabase.from('wo_assignees').insert({ work_order_id: woId, team_member_id: memberId })
-    if (!error) setAssignees(prev => [...prev, { id: m.id, name: m.name }])
+    if (!error) {
+      setAssignees(prev => [...prev, { id: m.id, name: m.name }])
+      // Notify the assignee via SMS/WhatsApp
+      if (m.auth_user_id) {
+        fetch('/api/notify/team', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            member_ids: [m.auth_user_id],
+            message: `📋 You've been assigned to a work order: ${woTitle}`,
+            wo_id: woId,
+            wo_title: woTitle,
+          }),
+        }).catch(() => {})
+      }
+    }
   }
   async function remove(memberId: string) {
     await supabase.from('wo_assignees').delete().eq('work_order_id', woId).eq('team_member_id', memberId)
@@ -536,7 +551,7 @@ function OverviewTab({
           </div>
           <div>
             <div className="text-xs uppercase mb-1" style={{ color: 'var(--text-muted)' }}>Assignees</div>
-            <AssigneesEditor woId={wo.id} initialAssignees={assignees} team={team} isAdmin={isAdmin} />
+            <AssigneesEditor woId={wo.id} woTitle={wo.title || ''} initialAssignees={assignees} team={team} isAdmin={isAdmin} />
           </div>
           <div>
             <div className="text-xs uppercase mb-1" style={{ color: 'var(--text-muted)' }}>Branch / Location</div>
