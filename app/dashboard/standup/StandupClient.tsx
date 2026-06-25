@@ -19,6 +19,8 @@ export type TeamMember = { id: string; name: string; auth_user_id: string | null
 export type WoOption = { id: string; title: string; clientName: string | null }
 export type Reaction = { id: string; post_id: string; user_id: string; emoji: string }
 
+const PANCHO_AUTHOR_ID = 'a0000000-0000-0000-0000-000000000001'
+
 const CHANNELS: { id: string; label: string }[] = [
   { id: 'general',  label: '🎉 General' },
   { id: 'standup',  label: '☀️ Standup' },
@@ -171,6 +173,17 @@ export default function StandupClient({
     if (error) console.error('Failed to create standup notifications:', error.message)
   }
 
+  // ── Pancho wall responder ──
+  async function triggerPancho(message: string, chan: string, parentId: string, threadPosts: { author: string; body: string }[]) {
+    try {
+      await fetch('/api/claude/wall', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, channel: chan, parent_id: parentId, thread_posts: threadPosts }),
+      })
+    } catch (e) { console.error('Pancho wall error:', e) }
+  }
+
   // ── post / reply ──
   async function submitPost(text: string, parentId: string | null, woId: string) {
     const clean = text.trim()
@@ -194,14 +207,25 @@ export default function StandupClient({
     setPosting(true)
     const res = await submitPost(body, null, postWo)
     setPosting(false)
-    if (res) { setBody(''); setPostWo(''); setMention(null) }
+    if (res) {
+      const txt = body
+      setBody(''); setPostWo(''); setMention(null)
+      if (/\@pancho/i.test(txt)) triggerPancho(txt, channel, res.id, [])
+    }
   }
   async function onReply(parentId: string) {
     if (!replyBody.trim()) return
     setReplyPosting(true)
     const res = await submitPost(replyBody, parentId, replyWo)
     setReplyPosting(false)
-    if (res) { setReplyBody(''); setReplyWo(''); setReplyTo(null); setMention(null) }
+    if (res) {
+      const txt = replyBody
+      const threadPosts = posts
+        .filter(p => p.id === parentId || p.parent_id === parentId)
+        .map(p => ({ author: authMap[p.author_id] || (p.author_id === PANCHO_AUTHOR_ID ? 'Pancho' : 'Someone'), body: p.body }))
+      setReplyBody(''); setReplyWo(''); setReplyTo(null); setMention(null)
+      if (/\@pancho/i.test(txt)) triggerPancho(txt, channel, parentId, threadPosts)
+    }
   }
   async function onDelete(id: string) {
     if (!confirm('Delete this post?')) return
@@ -292,8 +316,8 @@ export default function StandupClient({
   }, [posts, todayKey])
   const checkInTeam = useMemo(() => team.filter(t => t.auth_user_id && t.active !== false), [team])
 
-  const initials = (uid: string) => (authMap[uid] || '?')[0]?.toUpperCase() || '?'
-  const nameOf = (uid: string) => authMap[uid] || 'Someone'
+  const initials = (uid: string) => uid === PANCHO_AUTHOR_ID ? '🤖' : (authMap[uid] || '?')[0]?.toUpperCase() || '?'
+  const nameOf = (uid: string) => uid === PANCHO_AUTHOR_ID ? 'Pancho' : authMap[uid] || 'Someone'
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6">
