@@ -62,7 +62,7 @@ async function buildContext(level: 'owner' | 'admin' | 'team', authUserId: strin
     .limit(150)
 
   const filteredWos = level === 'team'
-    ? (wos || []).filter((w: any) => w.team_members?.auth_user_id === authUserId)
+    ? (wos || []).filter((w: any) => w.team_members?.auth_user_id === authUserId || (w.wo_assignees || []).some((a: any) => a.team_members?.auth_user_id === authUserId))
     : (wos || [])
 
   const stageCounts: Record<string, number> = {}
