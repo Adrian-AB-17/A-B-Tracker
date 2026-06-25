@@ -1859,6 +1859,11 @@ function ActionPlanPanel({ clientId, clientName, clientIndustry, month, hasData,
   const [items, setItems] = useState<ActionItem[]>([])
   const [generating, setGenerating] = useState(false)
   const [creatingId, setCreatingId] = useState<string | null>(null)
+  const [woModal, setWoModal] = useState<ActionItem | null>(null)
+  const [woOwner, setWoOwner] = useState('')
+  const [woAssignee, setWoAssignee] = useState('')
+  const [woDue, setWoDue] = useState('')
+  const [woSaving, setWoSaving] = useState(false)
 
   async function generate() {
     if (!hasData) return
@@ -1884,29 +1889,41 @@ function ActionPlanPanel({ clientId, clientName, clientIndustry, month, hasData,
     setGenerating(false)
   }
 
-  async function createWO(item: ActionItem) {
-    setCreatingId(item.id)
+  function openWoModal(item: ActionItem) {
+    setWoModal(item)
+    setWoOwner('Adrian')
+    setWoAssignee('')
+    setWoDue('')
+  }
+
+  async function confirmCreateWO() {
+    if (!woModal) return
+    setWoSaving(true)
     try {
       const res = await fetch('/api/work-orders/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: `[${clientName}] ${item.title}`,
+          title: woModal.title,
           client_id: clientId,
-          notes: item.description,
-          priority: item.priority,
-          stage: 'not_started',
+          notes: woModal.description,
+          priority: woModal.priority,
+          stage: 'not-started',
           source: 'action_plan',
           source_month: month,
+          owner_name: woOwner || undefined,
+          assignee_name: woAssignee || undefined,
+          due_date: woDue || undefined,
         }),
       })
       if (res.ok) {
-        setItems(prev => prev.map(p => p.id === item.id ? { ...p, created: true } : p))
+        setItems(prev => prev.map(p => p.id === woModal.id ? { ...p, created: true } : p))
+        setWoModal(null)
       }
     } catch (e) {
       console.error('WO create failed', e)
     }
-    setCreatingId(null)
+    setWoSaving(false)
   }
 
   const priorityColor: Record<string, string> = {
@@ -1967,7 +1984,7 @@ function ActionPlanPanel({ clientId, clientName, clientIndustry, month, hasData,
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{item.description}</p>
               </div>
               <button
-                onClick={() => createWO(item)}
+                onClick={() => openWoModal(item)}
                 disabled={!!item.created || creatingId === item.id}
                 className="text-xs px-3 py-1.5 rounded-lg font-semibold flex-shrink-0 disabled:opacity-50"
                 style={{
@@ -1984,8 +2001,89 @@ function ActionPlanPanel({ clientId, clientName, clientIndustry, month, hasData,
 
       {items.length > 0 && (
         <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
-          Action items are internal only — not visible to the client. Click "+ Create WO" to add to the work order board.
+          Action items are internal only — not visible to the client. Click &quot;+ Create WO&quot; to add to the work order board.
         </p>
+      )}
+
+      {/* WO Creation Slide-out Modal */}
+      {woModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', justifyContent: 'flex-end' }}>
+          <div onClick={() => setWoModal(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: 480, background: 'var(--bg-elevated, #fff)', height: '100%', overflowY: 'auto', boxShadow: '-4px 0 24px rgba(0,0,0,0.15)', display: 'flex', flexDirection: 'column' }}>
+            {/* Header */}
+            <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: 4 }}>New Work Order</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', lineHeight: 1.4 }}>{woModal.title}</div>
+                <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, fontWeight: 700, textTransform: 'uppercase',
+                    background: woModal.priority === 'high' ? '#fef2f2' : woModal.priority === 'medium' ? '#fffbeb' : '#f9fafb',
+                    color: woModal.priority === 'high' ? '#dc2626' : woModal.priority === 'medium' ? '#d97706' : '#6b7280',
+                  }}>{woModal.priority}</span>
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>{woModal.channel}</span>
+                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: '#ede9fe', color: '#6d28d9' }}>{clientName}</span>
+                </div>
+              </div>
+              <button onClick={() => setWoModal(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: 'var(--text-muted)', lineHeight: 1, padding: 4 }}>×</button>
+            </div>
+
+            {/* Body */}
+            <div style={{ flex: 1, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+              {/* Description */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Description</label>
+                <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, background: 'var(--bg)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border)' }}>
+                  {woModal.description}
+                </div>
+              </div>
+
+              {/* Owner */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Owner</label>
+                <select value={woOwner} onChange={e => setWoOwner(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg)', color: 'var(--text)' }}>
+                  <option value="">— Select owner —</option>
+                  {['Adrian', 'Tanya', 'Emily', 'Montse', 'Majo', 'Luciana', 'Caro', 'Stacia', 'Pau'].map(n => <option key={n}>{n}</option>)}
+                </select>
+              </div>
+
+              {/* Assignee */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Assignee <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
+                <select value={woAssignee} onChange={e => setWoAssignee(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg)', color: 'var(--text)' }}>
+                  <option value="">— Select assignee —</option>
+                  {['Adrian', 'Tanya', 'Emily', 'Montse', 'Majo', 'Luciana', 'Caro', 'Stacia', 'Pau'].map(n => <option key={n}>{n}</option>)}
+                </select>
+              </div>
+
+              {/* Due date */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Due Date <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
+                <input type="date" value={woDue} onChange={e => setWoDue(e.target.value)}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg)', color: 'var(--text)', boxSizing: 'border-box' }} />
+              </div>
+
+              {/* Stage — always Not Started */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Stage</label>
+                <div style={{ fontSize: 13, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-muted)' }}>Not Started</div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10 }}>
+              <button onClick={confirmCreateWO} disabled={woSaving || !woOwner}
+                style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: 'none', background: '#0f1e3f', color: 'white', fontSize: 14, fontWeight: 600, cursor: woSaving || !woOwner ? 'not-allowed' : 'pointer', opacity: woSaving || !woOwner ? 0.6 : 1 }}>
+                {woSaving ? 'Creating…' : '+ Create Work Order'}
+              </button>
+              <button onClick={() => setWoModal(null)}
+                style={{ padding: '10px 16px', borderRadius: 8, border: '1px solid var(--border)', background: 'white', fontSize: 14, cursor: 'pointer', color: 'var(--text-muted)' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
