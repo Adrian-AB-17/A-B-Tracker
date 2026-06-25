@@ -44,7 +44,7 @@ export default async function WoDetailPage({
   // Assignees for People card
   const { data: assigneeRows } = await supabase
     .from('wo_assignees')
-    .select('team_members(id, name)')
+    .select('team_members(id, name, auth_user_id)')
     .eq('work_order_id', params.id)
 
   const assignees = (assigneeRows || [])
