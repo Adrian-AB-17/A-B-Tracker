@@ -205,23 +205,29 @@ export default function CampaignDetailPage() {
                   <div style={{ fontSize: 12, fontWeight: 600, color: muted, textTransform: 'uppercase', marginBottom: 8 }}>{group}</div>
                 )}
                 {groupAds.map((ad, ai) => {
-                  const copy_json = ad.copy_json as Record<string, unknown>
+                  const cj = ad.copy_json as Record<string, unknown>
+                  const headlines = cj.headlines as string[] | undefined
+                  const descriptions = cj.descriptions as string[] | undefined
+                  const primaryText = cj.primary_text as string | undefined
+                  const headlineText = cj.headline as string | undefined
+                  const introText = cj.intro_text as string | undefined
+                  const imageDirection = cj.image_direction as string | undefined
                   const adKey = `ad-detail-${group}-${ai}`
                   return (
                     <div key={ai} style={{ background: 'white', border: '1px solid #E7E5E4', borderRadius: 8, marginBottom: 10, overflow: 'hidden' }}>
                       <div style={{ padding: '10px 16px', background: '#F5F5F4', borderBottom: '1px solid #E7E5E4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontWeight: 600, fontSize: 13, textTransform: 'uppercase', color: muted }}>{ad.ad_format as string}</span>
-                        <button onClick={() => copy(JSON.stringify(copy_json, null, 2), adKey)}
+                        <button onClick={() => copy(JSON.stringify(cj, null, 2), adKey)}
                           style={{ fontSize: 12, padding: '4px 10px', borderRadius: 4, border: '1px solid #E7E5E4', background: copiedKey === adKey ? '#EAF3DE' : 'white', cursor: 'pointer', color: copiedKey === adKey ? '#047857' : ink }}>
                           {copiedKey === adKey ? '✓ Copied' : 'Copy ad'}
                         </button>
                       </div>
                       <div style={{ padding: 16 }}>
-                        {copy_json.headlines && (
+                        {headlines && (
                           <div style={{ marginBottom: 12 }}>
                             <div style={{ fontSize: 11, fontWeight: 600, color: muted, textTransform: 'uppercase', marginBottom: 6 }}>Headlines</div>
                             <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                              {(copy_json.headlines as string[]).map((h, hi) => (
+                              {headlines.map((h, hi) => (
                                 <span key={hi} onClick={() => copy(h, `h-${adKey}-${hi}`)} style={{ fontSize: 12, padding: '3px 8px', background: '#F5F5F4', borderRadius: 4, cursor: 'pointer', border: '1px solid transparent' }}
                                   onMouseEnter={e => (e.currentTarget.style.borderColor = '#4285F4')}
                                   onMouseLeave={e => (e.currentTarget.style.borderColor = 'transparent')}>
@@ -231,10 +237,10 @@ export default function CampaignDetailPage() {
                             </div>
                           </div>
                         )}
-                        {copy_json.descriptions && (
+                        {descriptions && (
                           <div style={{ marginBottom: 12 }}>
                             <div style={{ fontSize: 11, fontWeight: 600, color: muted, textTransform: 'uppercase', marginBottom: 6 }}>Descriptions</div>
-                            {(copy_json.descriptions as string[]).map((d, di) => (
+                            {descriptions.map((d, di) => (
                               <div key={di} onClick={() => copy(d, `d-${adKey}-${di}`)} style={{ fontSize: 13, padding: '6px 8px', cursor: 'pointer', borderRadius: 4, marginBottom: 3, background: copiedKey === `d-${adKey}-${di}` ? '#EAF3DE' : '#FAFAF9', border: '1px solid #F5F5F4' }}>
                                 <span style={{ color: muted, fontSize: 11 }}>{di+1}. </span>{d}
                                 <span style={{ color: d.length > 90 ? '#b91c1c' : '#A8A29E', fontSize: 10, marginLeft: 6 }}>{d.length}/90</span>
@@ -242,10 +248,10 @@ export default function CampaignDetailPage() {
                             ))}
                           </div>
                         )}
-                        {copy_json.primary_text && <div style={{ marginBottom: 8, fontSize: 13 }}><span style={{ color: muted, fontSize: 11, fontWeight: 600 }}>PRIMARY TEXT: </span>{copy_json.primary_text as string}</div>}
-                        {copy_json.headline && <div style={{ marginBottom: 8, fontSize: 13 }}><span style={{ color: muted, fontSize: 11, fontWeight: 600 }}>HEADLINE: </span><strong>{copy_json.headline as string}</strong></div>}
-                        {copy_json.intro_text && <div style={{ marginBottom: 8, fontSize: 13 }}><span style={{ color: muted, fontSize: 11, fontWeight: 600 }}>INTRO: </span>{copy_json.intro_text as string}</div>}
-                        {copy_json.image_direction && <div style={{ fontSize: 12, color: muted, fontStyle: 'italic', padding: '6px 8px', background: '#FFFBEB', borderRadius: 4 }}>🎨 Creative direction: {copy_json.image_direction as string}</div>}
+                        {primaryText && <div style={{ marginBottom: 8, fontSize: 13 }}><span style={{ color: muted, fontSize: 11, fontWeight: 600 }}>PRIMARY TEXT: </span>{primaryText}</div>}
+                        {headlineText && <div style={{ marginBottom: 8, fontSize: 13 }}><span style={{ color: muted, fontSize: 11, fontWeight: 600 }}>HEADLINE: </span><strong>{headlineText}</strong></div>}
+                        {introText && <div style={{ marginBottom: 8, fontSize: 13 }}><span style={{ color: muted, fontSize: 11, fontWeight: 600 }}>INTRO: </span>{introText}</div>}
+                        {imageDirection && <div style={{ fontSize: 12, color: muted, fontStyle: 'italic', padding: '6px 8px', background: '#FFFBEB', borderRadius: 4 }}>🎨 Creative direction: {imageDirection}</div>}
                       </div>
                     </div>
                   )
