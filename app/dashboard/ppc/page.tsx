@@ -70,6 +70,23 @@ const METRIC_LABELS: Record<string, string> = {
   quality_score: 'Avg Quality Score',
 }
 
+type PerfRow = {
+  client_id: string
+  client_name: string
+  month: string
+  platform: string
+  spend: number
+  impressions: number
+  clicks: number
+  video_views: number
+}
+
+const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function fmt$(v: number) { return v >= 1000 ? `$${(v/1000).toFixed(1)}k` : `$${v.toFixed(0)}` }
+function fmtPct(v: number) { return `${v.toFixed(2)}%` }
+function fmtNum(v: number) { return v >= 1000 ? `${(v/1000).toFixed(1)}k` : String(v) }
+
 export default function PPCHubPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
@@ -77,8 +94,12 @@ export default function PPCHubPage() {
   const [selectedPeriod] = useState('Q3 2026')
   const [selectedClient, setSelectedClient] = useState('all')
   const [clients, setClients] = useState<{ id: string; name: string }[]>([])
+  const [activeView, setActiveView] = useState<'overview' | 'performance'>('overview')
+  const [perfData, setPerfData] = useState<PerfRow[]>([])
+  const [perfLoading, setPerfLoading] = useState(false)
 
   useEffect(() => { loadData() }, [])
+  useEffect(() => { if (activeView === 'performance') loadPerformance() }, [activeView])
 
   async function loadData() {
     setLoading(true)
@@ -91,6 +112,41 @@ export default function PPCHubPage() {
     setGoals((gs ?? []) as unknown as Goal[])
     setClients(cls ?? [])
     setLoading(false)
+  }
+
+  async function loadPerformance() {
+    setPerfLoading(true)
+    // Meta data from report_data (last 6 months)
+    const sixMonthsAgo = (() => {
+      const d = new Date()
+      d.setMonth(d.getMonth() - 6)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    })()
+
+    const { data: metaRows } = await supabase
+      .from('report_data')
+      .select('client_id, month, metric, value')
+      .eq('section', 'meta')
+      .gte('month', sixMonthsAgo)
+      .order('month')
+
+    // Group meta rows by client+month
+    const metaMap: Record<string, PerfRow> = {}
+    for (const r of metaRows ?? []) {
+      const key = `${r.client_id}__${r.month}`
+      if (!metaMap[key]) {
+        const cl = clients.find(c => c.id === r.client_id)
+        metaMap[key] = { client_id: r.client_id, client_name: cl?.name ?? r.client_id, month: r.month, platform: 'meta', spend: 0, impressions: 0, clicks: 0, video_views: 0 }
+      }
+      const v = parseFloat(r.value) || 0
+      if (r.metric === 'meta_spend')       metaMap[key].spend       += v
+      if (r.metric === 'meta_impressions') metaMap[key].impressions += v
+      if (r.metric === 'meta_clicks')      metaMap[key].clicks      += v
+      if (r.metric === 'meta_video_views') metaMap[key].video_views += v
+    }
+
+    setPerfData(Object.values(metaMap))
+    setPerfLoading(false)
   }
 
   const filteredCampaigns = selectedClient === 'all' ? campaigns : campaigns.filter(c => c.client_id === selectedClient)
@@ -127,8 +183,21 @@ export default function PPCHubPage() {
 
       <main style={{ maxWidth: 1300, margin: '0 auto', padding: '32px 24px' }}>
 
+        {/* View tabs */}
+        <div style={{ display: 'flex', gap: 4, marginBottom: 28, padding: 4, background: '#F5F5F4', borderRadius: 8, width: 'fit-content' }}>
+          {(['overview', 'performance'] as const).map(v => (
+            <button key={v} onClick={() => setActiveView(v)} style={{
+              padding: '6px 16px', fontSize: 13, fontWeight: 500, borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: activeView === v ? '#1C1917' : 'transparent',
+              color: activeView === v ? '#FAFAF9' : '#78716C',
+            }}>
+              {v === 'overview' ? 'Overview' : '📈 Performance'}
+            </button>
+          ))}
+        </div>
+
         {/* Platform Quick Links */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 32, flexWrap: 'wrap' }}>
+        {activeView === 'overview' && <div style={{ display: 'flex', gap: 8, marginBottom: 32, flexWrap: 'wrap' }}>
           {Object.entries(PLATFORM_LABELS).map(([key, label]) => (
             <Link key={key} href={`/dashboard/ppc/new?platform=${key}`}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', background: 'white', border: '1px solid #E7E5E4', borderRadius: 8, textDecoration: 'none', fontSize: 13, fontWeight: 500, color: ink }}>
@@ -136,10 +205,9 @@ export default function PPCHubPage() {
               {label}
             </Link>
           ))}
-        </div>
+        </div>}
 
-        {/* Goals Section */}
-        <section style={{ marginBottom: 48 }}>
+        {activeView === 'overview' && <section style={{ marginBottom: 48 }}>
           <div style={{ marginBottom: 16 }}>
             <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, color: muted, marginBottom: 4 }}>{selectedPeriod} Goals</p>
             <h3 style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.01em', margin: 0 }}>Montse's performance targets.</h3>
@@ -158,7 +226,9 @@ export default function PPCHubPage() {
                 acc[key].goals.push(g)
                 return acc
               }, {} as Record<string, { name: string; goals: Goal[] }>)
-            ).map(([clientId, { name, goals: clientGoals }]) => (
+            ).map(([clientId, groupData]) => {
+              const { name, goals: clientGoals } = groupData as { name: string; goals: Goal[] }
+              return (
               <div key={clientId} style={{ marginBottom: 24 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: muted, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{name}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
@@ -194,12 +264,12 @@ export default function PPCHubPage() {
                   })}
                 </div>
               </div>
-            ))
+              )
+            })
           )}
-        </section>
+        </section>}
 
-        {/* Campaign List */}
-        <section>
+        {activeView === 'overview' && <section>
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 16 }}>
             <div>
               <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, color: muted, marginBottom: 4 }}>Campaigns</p>
@@ -264,7 +334,171 @@ export default function PPCHubPage() {
               </table>
             </div>
           )}
-        </section>
+        </section>}
+
+        {/* ── PERFORMANCE TAB ── */}
+        {activeView === 'performance' && (
+          <div>
+            <div style={{ marginBottom: 28 }}>
+              <p style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, color: '#78716C', marginBottom: 4 }}>Last 6 Months · Paid Media</p>
+              <h3 style={{ fontSize: 24, fontWeight: 600, letterSpacing: '-0.01em', margin: '0 0 4px' }}>Performance baseline.</h3>
+              <p style={{ fontSize: 13, color: '#78716C', margin: 0 }}>Meta data from uploaded CSVs · Google Ads live via Windsor</p>
+            </div>
+
+            {perfLoading ? (
+              <div style={{ color: '#78716C', fontSize: 14 }}>Loading performance data…</div>
+            ) : perfData.length === 0 ? (
+              <div style={{ background: 'white', border: '1px solid #E7E5E4', borderRadius: 8, padding: 48, textAlign: 'center' }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
+                <div style={{ fontWeight: 600, marginBottom: 8 }}>No performance data yet</div>
+                <div style={{ fontSize: 13, color: '#78716C' }}>Upload the paid performance CSVs from Sprout Social in the Reports upload page to populate this view.</div>
+              </div>
+            ) : (() => {
+              // Group by client
+              const byClient: Record<string, PerfRow[]> = {}
+              for (const r of (selectedClient === 'all' ? perfData : perfData.filter(r => r.client_id === selectedClient))) {
+                if (!byClient[r.client_id]) byClient[r.client_id] = []
+                byClient[r.client_id].push(r)
+              }
+
+              // All months present in data (sorted)
+              const allMonths = [...new Set(perfData.map(r => r.month))].sort()
+
+              return (
+                <div>
+                  {/* Book-wide totals strip */}
+                  {selectedClient === 'all' && (() => {
+                    const total = perfData.reduce((a, r) => ({
+                      spend: a.spend + r.spend,
+                      impressions: a.impressions + r.impressions,
+                      clicks: a.clicks + r.clicks,
+                      video_views: a.video_views + r.video_views,
+                    }), { spend: 0, impressions: 0, clicks: 0, video_views: 0 })
+                    const ctr = total.impressions > 0 ? (total.clicks / total.impressions) * 100 : 0
+                    const cpm = total.impressions > 0 ? (total.spend / total.impressions) * 1000 : 0
+                    const cpc = total.clicks > 0 ? total.spend / total.clicks : 0
+                    return (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 1, background: '#D6D3D1', border: '1px solid #E7E5E4', borderRadius: 8, overflow: 'hidden', marginBottom: 32 }}>
+                        {[
+                          { label: 'Total Spend', value: fmt$(total.spend), sub: 'All clients · 6mo' },
+                          { label: 'Impressions', value: fmtNum(total.impressions) },
+                          { label: 'Clicks', value: fmtNum(total.clicks) },
+                          { label: 'CTR', value: fmtPct(ctr), flag: ctr < 1 },
+                          { label: 'CPM', value: fmt$(cpm), flag: cpm > 25 },
+                          { label: 'CPC', value: fmt$(cpc), flag: cpc > 5 },
+                        ].map((k, i) => (
+                          <div key={i} style={{ background: 'white', padding: '18px 16px' }}>
+                            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, color: '#78716C', marginBottom: 6 }}>{k.label}</div>
+                            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 24, fontWeight: 700, color: k.flag ? '#b91c1c' : '#1C1917' }}>{k.value}</div>
+                            {k.sub && <div style={{ fontSize: 11, color: '#78716C', marginTop: 4 }}>{k.sub}</div>}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Client breakdown table */}
+                  <section style={{ marginBottom: 40 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Meta Ads — Client Breakdown</p>
+                    <div style={{ border: '1px solid #E7E5E4', borderRadius: 8, overflow: 'hidden', background: 'white' }}>
+                      <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                        <thead style={{ background: '#FAFAF9', borderBottom: '1px solid #E7E5E4' }}>
+                          <tr>
+                            {['Client', 'Month', 'Spend', 'Impressions', 'Clicks', 'CTR', 'CPM', 'CPC', 'Video Views'].map(h => (
+                              <th key={h} style={{ padding: '10px 14px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, color: '#78716C', textAlign: h === 'Client' || h === 'Month' ? 'left' : 'right' }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(byClient).flatMap(([, rows]) =>
+                            rows.sort((a, b) => b.month.localeCompare(a.month)).map((r, i) => {
+                              const ctr = r.impressions > 0 ? (r.clicks / r.impressions) * 100 : 0
+                              const cpm = r.impressions > 0 ? (r.spend / r.impressions) * 1000 : 0
+                              const cpc = r.clicks > 0 ? r.spend / r.clicks : 0
+                              const [yr, mo] = r.month.split('-')
+                              const monthLabel = `${MONTH_LABELS[parseInt(mo) - 1]} ${yr}`
+                              return (
+                                <tr key={`${r.client_id}-${r.month}`} style={{ borderTop: '1px solid #E7E5E4' }}
+                                  onMouseEnter={e => (e.currentTarget.style.background = '#F5F5F4')}
+                                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                                  <td style={{ padding: '10px 14px', fontWeight: i === 0 ? 600 : 400 }}>{i === 0 ? r.client_name : ''}</td>
+                                  <td style={{ padding: '10px 14px', color: '#78716C' }}>{monthLabel}</td>
+                                  <td style={{ padding: '10px 14px', fontFamily: 'monospace', textAlign: 'right', fontWeight: 600 }}>{fmt$(r.spend)}</td>
+                                  <td style={{ padding: '10px 14px', fontFamily: 'monospace', textAlign: 'right' }}>{fmtNum(r.impressions)}</td>
+                                  <td style={{ padding: '10px 14px', fontFamily: 'monospace', textAlign: 'right' }}>{fmtNum(r.clicks)}</td>
+                                  <td style={{ padding: '10px 14px', fontFamily: 'monospace', textAlign: 'right', color: ctr >= 2 ? '#047857' : ctr >= 1 ? '#B45309' : '#b91c1c' }}>{fmtPct(ctr)}</td>
+                                  <td style={{ padding: '10px 14px', fontFamily: 'monospace', textAlign: 'right', color: cpm <= 15 ? '#047857' : cpm <= 25 ? '#B45309' : '#b91c1c' }}>{fmt$(cpm)}</td>
+                                  <td style={{ padding: '10px 14px', fontFamily: 'monospace', textAlign: 'right', color: cpc <= 1 ? '#047857' : cpc <= 3 ? '#B45309' : '#b91c1c' }}>{fmt$(cpc)}</td>
+                                  <td style={{ padding: '10px 14px', fontFamily: 'monospace', textAlign: 'right', color: '#78716C' }}>{fmtNum(r.video_views)}</td>
+                                </tr>
+                              )
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+
+                  {/* Q3 Goals progress — using perf data as current */}
+                  <section style={{ marginBottom: 40 }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: '#78716C', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Q3 2026 Goal Progress</p>
+                    <h3 style={{ fontSize: 20, fontWeight: 600, margin: '0 0 16px' }}>Montse's targets vs baseline.</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {(selectedClient === 'all' ? goals : goals.filter(g => g.client_id === selectedClient))
+                        .filter(g => g.platform === 'meta')
+                        .map(g => {
+                          // Get latest month data for this client
+                          const clientRows = perfData.filter(r => r.client_id === g.client_id && r.platform === 'meta').sort((a, b) => b.month.localeCompare(a.month))
+                          const latest = clientRows[0]
+                          let current = 0
+                          if (latest) {
+                            const ctr = latest.impressions > 0 ? (latest.clicks / latest.impressions) * 100 : 0
+                            const cpm = latest.impressions > 0 ? (latest.spend / latest.impressions) * 1000 : 0
+                            const cpc = latest.clicks > 0 ? latest.spend / latest.clicks : 0
+                            if (g.metric === 'ctr') current = ctr
+                            if (g.metric === 'cpm') current = cpm
+                            if (g.metric === 'cpc') current = cpc
+                          }
+                          if (!latest) return null
+                          const clientName = (g.clients as unknown as { name: string })?.name || g.client_id
+                          const unit = g.unit
+                          const fmt = (v: number) => unit === '$' ? fmt$(v) : unit === '%' ? fmtPct(v) : `${v}x`
+                          const pct = g.lower_is_better
+                            ? (g.baseline ? Math.min(100, Math.max(0, Math.round(((g.baseline - current) / (g.baseline - g.target)) * 100))) : 0)
+                            : Math.min(100, Math.max(0, Math.round((current / g.target) * 100)))
+                          const hit = g.lower_is_better ? current <= g.target : current >= g.target
+                          const color = hit ? '#047857' : pct >= 60 ? '#D97706' : '#b91c1c'
+                          return (
+                            <div key={g.id} style={{ background: 'white', border: '1px solid #E7E5E4', borderRadius: 8, padding: '14px 18px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                                <div>
+                                  <div style={{ fontWeight: 600, fontSize: 13 }}>{clientName} · {METRIC_LABELS[g.metric] || g.metric}</div>
+                                  <div style={{ fontSize: 11, color: '#78716C', marginTop: 2 }}>Meta · Target: {g.lower_is_better ? '≤' : '≥'}{fmt(g.target)}</div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                  <div style={{ fontFamily: 'monospace', fontSize: 20, fontWeight: 700, color }}>{fmt(current)}</div>
+                                  <div style={{ fontSize: 11, color: hit ? '#047857' : '#78716C', fontWeight: 600 }}>{hit ? '✓ On target' : `${pct}% to goal`}</div>
+                                </div>
+                              </div>
+                              <div style={{ height: 5, background: '#F5F5F4', borderRadius: 9999 }}>
+                                <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 9999, transition: 'width 0.4s' }} />
+                              </div>
+                            </div>
+                          )
+                        }).filter(Boolean)}
+                    </div>
+                  </section>
+
+                  {/* Google Ads note */}
+                  <div style={{ background: '#EDF4FB', border: '1px solid #BFDBFE', borderRadius: 8, padding: '14px 18px', fontSize: 13, color: '#185FA5' }}>
+                    <strong>Google Ads</strong> — Live data available per client in the Reports section via Windsor. Historical 6-month trend coming once campaign data accumulates in the system.
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
       </main>
     </div>
   )
