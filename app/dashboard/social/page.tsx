@@ -331,8 +331,8 @@ export default function SocialHubPage() {
     setSyncing(false)
   }
 
-  const currentMonth = now.getMonth()
-  const currentYear = now.getFullYear()
+  const currentMonth = nextMonth.getMonth()
+  const currentYear = nextMonth.getFullYear()
   const [windowOffset, setWindowOffset] = useState(0)
   const months3 = [-2, -1, 0].map(offset => {
     const totalOffset = offset + windowOffset
@@ -531,7 +531,7 @@ export default function SocialHubPage() {
               </table>
             </div>
           </div>
-        </section>
+        </section>}
 
         {/* Network ROI */}
         {activeView === 'overview' && networks.length > 0 && (
