@@ -422,22 +422,50 @@ export default function ReportsUploadPage() {
       }
 
     } else if (fileType === 'paid_performance') {
+      const accountCol = headers.indexOf('Ad Account')
       const spendCol = headers.indexOf('Total Spend')
       const impressionsCol = headers.indexOf('Impressions')
       const clicksCol = headers.indexOf('Clicks')
+      const linkClicksCol = headers.indexOf('Engagement - Link Clicks')
+      const videoViewsCol = headers.indexOf('Video Views')
       const campCol = headers.indexOf('Campaign')
-      const metrics: Record<string, number> = {}
-      let rowCount = 0
+      // Aggregate per matched client
+      const perClient: Record<string, { metrics: Record<string, number>; rows: number }> = {}
+      const unmatched: string[] = []
       for (let i = 1; i < lines.length; i++) {
         const cols = parseCSVLine(lines[i])
         if (!cols[campCol]) continue
-        rowCount++
-        metrics['meta__spend'] = (metrics['meta__spend'] || 0) + cleanMoney(cols[spendCol])
-        metrics['meta__impressions'] = (metrics['meta__impressions'] || 0) + cleanNum(cols[impressionsCol])
-        metrics['meta__clicks'] = (metrics['meta__clicks'] || 0) + cleanNum(cols[clicksCol])
+        const adAccount = cols[accountCol] || ''
+        const matched = CLIENTS.find(c => matchesClient(adAccount, c.id))
+        if (!matched) {
+          if (adAccount && !unmatched.includes(adAccount)) unmatched.push(adAccount)
+          continue
+        }
+        if (!perClient[matched.id]) perClient[matched.id] = { metrics: {}, rows: 0 }
+        const m = perClient[matched.id].metrics
+        perClient[matched.id].rows++
+        m['meta__spend'] = (m['meta__spend'] || 0) + cleanMoney(cols[spendCol])
+        m['meta__impressions'] = (m['meta__impressions'] || 0) + cleanNum(cols[impressionsCol])
+        m['meta__clicks'] = (m['meta__clicks'] || 0) + cleanNum(cols[clicksCol])
+        m['meta__link_clicks'] = (m['meta__link_clicks'] || 0) + cleanNum(cols[linkClicksCol])
+        m['meta__video_views'] = (m['meta__video_views'] || 0) + cleanNum(cols[videoViewsCol])
       }
-      // Paid doesn't have profile column — write to selected client
-      results.push({ clientId: 'all', clientName: 'All (manual assignment needed)', rows: rowCount, metrics })
+      // Upsert each matched client to report_data
+      for (const [clientId, { metrics, rows }] of Object.entries(perClient)) {
+        const clientName = CLIENTS.find(c => c.id === clientId)?.name ?? clientId
+        const upsertRows = [
+          { client_id: clientId, month, section: 'meta', platform: 'all', metric: 'meta_spend', value: metrics['meta__spend'] || 0 },
+          { client_id: clientId, month, section: 'meta', platform: 'all', metric: 'meta_impressions', value: metrics['meta__impressions'] || 0 },
+          { client_id: clientId, month, section: 'meta', platform: 'all', metric: 'meta_clicks', value: metrics['meta__clicks'] || 0 },
+          { client_id: clientId, month, section: 'meta', platform: 'all', metric: 'meta_link_clicks', value: metrics['meta__link_clicks'] || 0 },
+          { client_id: clientId, month, section: 'meta', platform: 'all', metric: 'meta_video_views', value: metrics['meta__video_views'] || 0 },
+        ]
+        await supabase.from('report_data').upsert(upsertRows, { onConflict: 'client_id,month,section,platform,metric' })
+        results.push({ clientId, clientName, rows, metrics })
+      }
+      if (unmatched.length > 0) {
+        results.push({ clientId: 'all', clientName: `Unmatched accounts: ${unmatched.join(', ')}`, rows: 0, metrics: {} })
+      }
     }
 
     // Save upload log
