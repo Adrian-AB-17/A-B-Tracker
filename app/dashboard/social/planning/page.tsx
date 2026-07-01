@@ -293,6 +293,12 @@ export default function PlanningBoardPage() {
   const [uploadingAsset, setUploadingAsset] = useState<string | null>(null)
   const [videoLinkInput, setVideoLinkInput] = useState<Record<string, string>>({})
   const [showEmail, setShowEmail] = useState(false)
+  const [insights, setInsights] = useState<{
+    topPosts: { text: string; eng: number; type: string }[]
+    zeroPosts: { text: string; type: string; impressions: number }[]
+    typePerf: { type: string; avg: number; zeros: number; total: number }[]
+  } | null>(null)
+  const [insightsLoading, setInsightsLoading] = useState(false)
 
   const months3 = [-2, -1, 0].map(offset => {
     const m = (currentMonth + offset + 12) % 12
@@ -303,6 +309,43 @@ export default function PlanningBoardPage() {
 
   useEffect(() => { loadPlan() }, [selectedClient, selectedMonth, selectedYear])
   useEffect(() => { loadCaptions() }, [selectedClient])
+  useEffect(() => { loadInsights() }, [selectedClient])
+
+  async function loadInsights() {
+    setInsightsLoading(true)
+    const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+
+    const [{ data: top }, { data: zero }, { data: all }] = await Promise.all([
+      supabase.from('sprout_posts').select('text_content, engagements, post_type')
+        .eq('client_name', selectedClient).not('text_content', 'is', null)
+        .gte('published_at', since).order('engagements', { ascending: false }).limit(5),
+      supabase.from('sprout_posts').select('text_content, post_type, impressions, engagements')
+        .eq('client_name', selectedClient).not('text_content', 'is', null)
+        .gte('published_at', since).eq('engagements', 0).gt('impressions', 30)
+        .order('impressions', { ascending: false }).limit(5),
+      supabase.from('sprout_posts').select('post_type, engagements')
+        .eq('client_name', selectedClient).gte('published_at', since),
+    ])
+
+    const typeMap: Record<string, { total: number; sum: number; zeros: number }> = {}
+    for (const p of all ?? []) {
+      const t = p.post_type ?? 'unknown'
+      if (!typeMap[t]) typeMap[t] = { total: 0, sum: 0, zeros: 0 }
+      typeMap[t].total++
+      typeMap[t].sum += p.engagements ?? 0
+      if ((p.engagements ?? 0) === 0) typeMap[t].zeros++
+    }
+    const typePerf = Object.entries(typeMap)
+      .map(([type, d]) => ({ type, avg: parseFloat((d.sum / d.total).toFixed(1)), zeros: d.zeros, total: d.total }))
+      .sort((a, b) => b.avg - a.avg)
+
+    setInsights({
+      topPosts: (top ?? []).map(p => ({ text: p.text_content ?? '', eng: p.engagements ?? 0, type: p.post_type ?? '' })),
+      zeroPosts: (zero ?? []).map(p => ({ text: p.text_content ?? '', type: p.post_type ?? '', impressions: p.impressions ?? 0 })),
+      typePerf,
+    })
+    setInsightsLoading(false)
+  }
 
   async function loadPlan() {
     setLoading(true)
@@ -611,6 +654,68 @@ www.abconsultingg.com
           </div>
         </div>
       )}
+
+        {/* Performance Insights Panel */}
+        {insights && !insightsLoading && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+            {/* What's Working */}
+            <div style={{ background: 'white', border: '1px solid #E7E5E4', borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#047857', marginBottom: 10 }}>
+                ✓ What's Working — Top 5 Posts (Last 90 Days)
+              </div>
+              {insights.topPosts.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#78716C' }}>No data yet for this client.</div>
+              ) : insights.topPosts.map((p, i) => (
+                <div key={i} style={{ borderTop: i > 0 ? '1px solid #F5F5F4' : undefined, paddingTop: i > 0 ? 8 : 0, marginTop: i > 0 ? 8 : 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#047857', background: '#EAF3DE', padding: '1px 6px', borderRadius: 4 }}>{p.eng} eng</span>
+                    <span style={{ fontSize: 10, color: '#A8A29E' }}>{p.type.toLowerCase().replace('_', ' ')}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#1C1917', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {p.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* What's Bombing */}
+            <div style={{ background: 'white', border: '1px solid #E7E5E4', borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#b91c1c', marginBottom: 10 }}>
+                ✗ What's Bombing — Zero Engagement (Had Impressions)
+              </div>
+              {insights.zeroPosts.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#78716C' }}>No zero-engagement posts with impressions — great!</div>
+              ) : insights.zeroPosts.map((p, i) => (
+                <div key={i} style={{ borderTop: i > 0 ? '1px solid #F5F5F4' : undefined, paddingTop: i > 0 ? 8 : 0, marginTop: i > 0 ? 8 : 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: '#b91c1c', background: '#FEE2E2', padding: '1px 6px', borderRadius: 4 }}>0 eng / {p.impressions} imp</span>
+                    <span style={{ fontSize: 10, color: '#A8A29E' }}>{p.type.toLowerCase().replace('_', ' ')}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#78716C', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {p.text}
+                  </div>
+                </div>
+              ))}
+              {/* Post type breakdown */}
+              {insights.typePerf.length > 0 && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #F5F5F4' }}>
+                  <div style={{ fontSize: 10, fontWeight: 600, color: '#78716C', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Format Performance</div>
+                  {insights.typePerf.slice(0, 5).map((t, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+                      <span style={{ color: '#1C1917' }}>{t.type.toLowerCase().replace(/_/g, ' ')}</span>
+                      <span style={{ color: t.avg >= 10 ? '#047857' : t.avg >= 3 ? '#B45309' : '#b91c1c', fontWeight: 600, fontFamily: 'monospace' }}>
+                        avg {t.avg} eng · {t.zeros}/{t.total} zero
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {insightsLoading && (
+          <div style={{ fontSize: 12, color: '#78716C', marginBottom: 16 }}>Loading performance insights…</div>
+        )}
 
         {/* Workflow legend */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>

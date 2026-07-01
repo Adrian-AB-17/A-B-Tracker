@@ -29,7 +29,43 @@ export async function POST(req: NextRequest) {
     .order('engagements', { ascending: false })
     .limit(5)
 
-  // 3. Approved library captions for same pillar
+  // 3. Zero-engagement posts (what NOT to do)
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const { data: zeroEngPosts } = await supabase
+    .from('sprout_posts')
+    .select('text_content, post_type, engagements, impressions')
+    .eq('client_name', client_name)
+    .not('text_content', 'is', null)
+    .gte('published_at', ninetyDaysAgo)
+    .eq('engagements', 0)
+    .gt('impressions', 50)
+    .order('impressions', { ascending: false })
+    .limit(5)
+
+  // 4. Post type performance breakdown
+  const { data: allRecentPosts } = await supabase
+    .from('sprout_posts')
+    .select('post_type, engagements')
+    .eq('client_name', client_name)
+    .gte('published_at', ninetyDaysAgo)
+
+  const typePerf: Record<string, { total: number; sum: number; zeros: number }> = {}
+  for (const p of allRecentPosts ?? []) {
+    const t = p.post_type ?? 'unknown'
+    if (!typePerf[t]) typePerf[t] = { total: 0, sum: 0, zeros: 0 }
+    typePerf[t].total++
+    typePerf[t].sum += p.engagements ?? 0
+    if ((p.engagements ?? 0) === 0) typePerf[t].zeros++
+  }
+  const typePerfLines = Object.entries(typePerf)
+    .map(([type, d]) => `${type}: avg ${(d.sum / d.total).toFixed(1)} eng, ${d.zeros}/${d.total} zero-eng`)
+    .sort((a, b) => {
+      const avgA = typePerf[a.split(':')[0]]?.sum / typePerf[a.split(':')[0]]?.total || 0
+      const avgB = typePerf[b.split(':')[0]]?.sum / typePerf[b.split(':')[0]]?.total || 0
+      return avgB - avgA
+    })
+
+  // Approved library captions for same pillar
   const { data: libCaps } = await supabase
     .from('social_captions')
     .select('caption_text, topic')
@@ -61,8 +97,16 @@ BRAND PROFILE FOR ${client_name.toUpperCase()}:
 - Extra context: ${bp.extra_context ?? ''}` : `Client: ${client_name}. No brand profile set up yet.`
 
   const topPostsSection = topPosts?.length ? `
-TOP PERFORMING POSTS (highest engagement — use for voice/style reference):
+TOP PERFORMING POSTS (highest engagement — mirror this voice and style):
 ${topPosts.map((p, i) => `${i+1}. [${p.engagements} eng | ${p.post_type}]\n${p.text_content}`).join('\n\n')}` : ''
+
+  const zeroEngSection = zeroEngPosts?.length ? `
+ZERO-ENGAGEMENT POSTS — THESE FAILED (got impressions but zero reactions — avoid this style, tone, and approach entirely):
+${zeroEngPosts.map((p, i) => `${i+1}. [0 eng | ${p.impressions} impressions | ${p.post_type}]\n${p.text_content}`).join('\n\n')}` : ''
+
+  const typeSection = typePerfLines.length ? `
+POST TYPE PERFORMANCE (best to worst avg engagement):
+${typePerfLines.join('\n')}` : ''
 
   const libSection = libCaps?.length ? `
 APPROVED CAPTIONS FROM LIBRARY (same pillar — match this voice closely):
@@ -76,6 +120,8 @@ ${competitor_post || bp?.competitor_examples}` : ''
 
 ${brandSection}
 ${topPostsSection}
+${zeroEngSection}
+${typeSection}
 ${libSection}
 ${competitorSection}
 
@@ -93,6 +139,7 @@ WRITING RULES:
 5. Never use any words from the avoid list
 6. End with the CTA naturally if appropriate
 7. Sound like a real person wrote this
+8. NEVER replicate the tone, structure, or approach of the zero-engagement posts listed above — those failed for this audience
 
 Return ONLY: caption text, then a blank line, then "HASHTAGS:" followed by the hashtags on the same line.`
 
