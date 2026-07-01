@@ -80,8 +80,9 @@ function MiniSparkbar({ values, color }: { values: number[], color: string }) {
 
 export default function SocialHubPage() {
   const now = new Date()
-  const [selectedMonth, setSelectedMonth] = useState((now.getMonth() + 1) % 12)
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear())
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+  const [selectedMonth, setSelectedMonth] = useState(nextMonth.getMonth())
+  const [selectedYear, setSelectedYear] = useState(nextMonth.getFullYear())
   const [clients, setClients] = useState<ClientStat[]>([])
   const [agg, setAgg] = useState<AggregateStat | null>(null)
   const [networks, setNetworks] = useState<NetworkStat[]>([])

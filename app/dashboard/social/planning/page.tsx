@@ -272,8 +272,10 @@ function Column({ title, emoji, slots, type, addSlot, editingId, setEditingId, u
 
 export default function PlanningBoardPage() {
   const now = new Date()
-  const currentMonth = (now.getMonth() + 1) % 12
-  const currentYear = now.getFullYear()
+  // Work one month ahead: default to next calendar month
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+  const currentMonth = nextMonth.getMonth()
+  const currentYear = nextMonth.getFullYear()
 
   const [selectedClient, setSelectedClient] = useState(CLIENTS[0])
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
