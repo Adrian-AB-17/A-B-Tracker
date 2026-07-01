@@ -74,19 +74,19 @@ export default function CampaignDetailPage() {
   if (!campaign) return <div style={{ padding: 48, color: muted, fontFamily: "'Inter', sans-serif" }}>Campaign not found.</div>
 
   // Group keywords by ad group
-  const kwByGroup = keywords.reduce((acc, kw) => {
+  const kwByGroup: Record<string, Record<string, unknown>[]> = {}
+  for (const kw of keywords) {
     const group = (kw.ad_group as string) || '_ungrouped'
-    if (!acc[group]) acc[group] = []
-    acc[group].push(kw)
-    return acc
-  }, {} as Record<string, Record<string, unknown>[]>)
+    if (!kwByGroup[group]) kwByGroup[group] = []
+    kwByGroup[group].push(kw)
+  }
 
-  const adsByGroup = ads.reduce((acc, ad) => {
+  const adsByGroup: Record<string, Record<string, unknown>[]> = {}
+  for (const ad of ads) {
     const group = (ad.ad_group as string) || '_ungrouped'
-    if (!acc[group]) acc[group] = []
-    acc[group].push(ad)
-    return acc
-  }, {} as Record<string, Record<string, unknown>[]>)
+    if (!adsByGroup[group]) adsByGroup[group] = []
+    adsByGroup[group].push(ad)
+  }
 
   const positiveKws = keywords.filter(k => !k.is_negative)
   const negativeKws = keywords.filter(k => k.is_negative)
