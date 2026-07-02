@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
       (w.wo_assignees || []).some((a: any) => a.team_members?.auth_user_id === user.id)
     )
 
-    const EXCLUDE_OVERDUE = ['approved', 'sent-for-approval', 'revisions-received', 'paid', 'invoiced', 'archived', 'deliverables-executed', 'on-hold']
+    const EXCLUDE_OVERDUE = ['approved', 'sent-for-approval', 'deliverables-completed', 'revisions-received', 'paid', 'invoiced', 'archived', 'deliverables-executed', 'on-hold']
     const overdueApproved = filtered.filter((w: any) => w.due_date && w.due_date < today && !EXCLUDE_OVERDUE.includes(w.stage))
     const dueToday = filtered.filter((w: any) => w.due_date === today)
 

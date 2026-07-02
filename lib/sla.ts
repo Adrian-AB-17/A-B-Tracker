@@ -70,7 +70,7 @@ export function daysInStage(wo: Pick<WorkOrder, 'stage_entered_at' | 'submitted_
  * Never returns true for 'paid' or 'archived'.
  */
 export function isStale(wo: Pick<WorkOrder, 'stage' | 'stage_entered_at' | 'submitted_at'>): boolean {
-  if (['paid', 'archived', 'on-hold', 'deliverables-completed', 'sent-for-approval', 'revisions-received', 'approved', 'deliverables-executed', 'invoiced'].includes(wo.stage)) return false
+  if (['paid', 'archived', 'on-hold', 'deliverables-completed', 'sent-for-approval', 'revisions-received', 'approved', 'ordered', 'deliverables-executed', 'invoiced'].includes(wo.stage)) return false
   return daysInStage(wo) >= STALE_DAYS
 }
 
@@ -79,7 +79,7 @@ export function isStale(wo: Pick<WorkOrder, 'stage' | 'stage_entered_at' | 'subm
  * Implies isStale(wo) is also true. Drives red highlighting in alerts.
  */
 export function isCriticallyStale(wo: Pick<WorkOrder, 'stage' | 'stage_entered_at' | 'submitted_at'>): boolean {
-  if (['paid', 'archived', 'on-hold', 'deliverables-completed', 'sent-for-approval', 'revisions-received', 'approved', 'deliverables-executed', 'invoiced'].includes(wo.stage)) return false
+  if (['paid', 'archived', 'on-hold', 'deliverables-completed', 'sent-for-approval', 'revisions-received', 'approved', 'ordered', 'deliverables-executed', 'invoiced'].includes(wo.stage)) return false
   return daysInStage(wo) >= CRITICALLY_STALE_DAYS
 }
 
@@ -89,7 +89,7 @@ export function isCriticallyStale(wo: Pick<WorkOrder, 'stage' | 'stage_entered_a
  */
 export function isOverdue(wo: Pick<WorkOrder, 'due_date' | 'stage'>): boolean {
   if (!wo.due_date) return false
-  if (['paid', 'archived', 'on-hold', 'deliverables-completed', 'sent-for-approval', 'revisions-received', 'approved', 'deliverables-executed', 'invoiced'].includes(wo.stage)) return false
+  if (['paid', 'archived', 'on-hold', 'deliverables-completed', 'sent-for-approval', 'revisions-received', 'approved', 'ordered', 'deliverables-executed', 'invoiced'].includes(wo.stage)) return false
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const due = new Date(wo.due_date)

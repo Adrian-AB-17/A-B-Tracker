@@ -17,10 +17,9 @@ export const dynamic = 'force-dynamic'
  * Grouped by client. No dollar amounts.
  */
 
-// Only these stages need attention; everything else (invoiced/approved/
-// deliverables-executed/paid/archived/on-hold) is effectively done.
-const ACTION_STAGES = ['not-started', 'in-progress', 'revisions-received', 'deliverables-completed', 'sent-for-approval']
-// Internal/test client to exclude from the operations digest.
+// Only stages where work is actively needed; once deliverables are done, not overdue.
+const ACTION_STAGES = ['submitted', 'not-started', 'in-progress', 'revisions-received']
+// Exclude internal/test client and archived clients from digest.
 const EXCLUDE_CLIENT_ID = 'a-b-consulting-group'
 
 // Central time "today" boundaries (America/Chicago), returned as YYYY-MM-DD.
@@ -64,6 +63,7 @@ export async function GET(req: NextRequest) {
     .not('due_date', 'is', null)
     .in('stage', ACTION_STAGES)
     .neq('client_id', EXCLUDE_CLIENT_ID)
+    .not('clients.status', 'eq', 'archived')
     .lte('due_date', weekEnd)
     .order('due_date', { ascending: true })
 

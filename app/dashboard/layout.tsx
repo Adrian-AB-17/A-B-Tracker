@@ -92,9 +92,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   counts.flagged = flaggedCount ?? 0
 
   // Stale + overdue: fetch lightweight set, compute in JS (mirrors lib/sla.ts logic)
+  const DONE_STAGES = ['paid','archived','deliverables-completed','sent-for-approval','approved','ordered','deliverables-executed','invoiced','on-hold']
   const { data: liveWos } = await supabase
     .from('work_orders')
-    .select('id, stage, due_date, stage_entered_at, submitted_at')
+    .select('id, stage, due_date, stage_entered_at, submitted_at, client_id')
     .not('stage', 'in', '(paid,archived)')
 
   const STALE_DAYS = 10
@@ -112,8 +113,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       const days = Math.max(0, Math.floor((now - new Date(anchor).getTime()) / (1000 * 60 * 60 * 24)))
       if (days >= STALE_DAYS) staleCount++
     }
-    // overdue check
-    if (w.due_date) {
+    // overdue check — skip done stages
+    if (w.due_date && !DONE_STAGES.includes(w.stage)) {
       const dueMs = new Date(w.due_date).setHours(0, 0, 0, 0)
       if (dueMs < todayMs) overdueCount++
     }
